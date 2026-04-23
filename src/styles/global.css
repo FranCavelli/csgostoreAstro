@@ -135,15 +135,27 @@
   --rarity: #d4a84c;
   position: relative;
   isolation: isolate;
-  border-color: color-mix(in srgb, var(--rarity) 40%, rgba(255, 255, 255, 0.14));
+  /* Fondo más oscuro que .glass: mismo canto iluminado arriba pero con una
+     capa negra translúcida debajo. El blur se sigue viendo, solo que el
+     cuerpo de la card queda visualmente "apagado" hasta que pasa el mouse. */
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.01) 45%,
+      rgba(255, 255, 255, 0.03) 100%
+    ),
+    rgba(8, 6, 10, 0.55);
+  border-color: color-mix(in srgb, var(--rarity) 40%, rgba(255, 255, 255, 0.12));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-    0 20px 40px -24px rgba(0, 0, 0, 0.85);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03),
+    0 20px 40px -24px rgba(0, 0, 0, 0.9);
   transition:
     border-color 200ms ease,
     transform 200ms ease,
-    box-shadow 200ms ease;
+    box-shadow 200ms ease,
+    background 200ms ease;
 }
 /* Los hijos reales quedan arriba del ::after */
 .item-card > * {
@@ -170,7 +182,7 @@
       color-mix(in srgb, var(--rarity) 18%, transparent) 0%,
       transparent 60%
     );
-  opacity: 0.5;
+  opacity: 0.3;
   transition: opacity 260ms ease;
 }
 /* Strip superior saturado, arriba de todo */
@@ -192,6 +204,15 @@
 .item-card:hover {
   border-color: color-mix(in srgb, var(--rarity) 90%, transparent);
   transform: translateY(-3px);
+  /* En hover aclara levemente el fondo para potenciar el "prendido" del wash */
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.02) 45%,
+      rgba(255, 255, 255, 0.05) 100%
+    ),
+    rgba(12, 10, 14, 0.4);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 0 0 1px color-mix(in srgb, var(--rarity) 60%, transparent),
