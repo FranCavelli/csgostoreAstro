@@ -129,11 +129,15 @@
     color: transparent;
   }
   .hero-title {
-    @apply font-display font-bold uppercase;
-    font-size: clamp(2.25rem, 8vw, 5.5rem);
+    @apply font-display;
+    font-weight: 800;
+    /* Ejes variables de Fraunces: suavidad máxima + un toque de "wonk" (asimetrías
+       expresivas) → se siente con personalidad pero sin dejar de ser elegante. */
+    font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 144;
+    font-size: clamp(2.5rem, 9vw, 6rem);
     line-height: 0.95;
-    letter-spacing: 0.08em;
-    text-shadow: 0 0 80px rgba(212, 168, 76, 0.2);
+    letter-spacing: -0.01em;
+    text-shadow: 0 0 80px rgba(212, 168, 76, 0.25);
   }
   .hero-avatar {
     box-shadow:
