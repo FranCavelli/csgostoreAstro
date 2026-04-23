@@ -14,6 +14,7 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        display: ["'Cinzel'", "'Trajan Pro'", "Georgia", "serif"],
       },
       borderRadius: {
         xl2: "14px",

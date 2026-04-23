@@ -35,33 +35,44 @@ const emptyCache = all.length === 0;
 ---
 
 <Layout title="Sixbulletss Store · CS2 skins">
-  <section class="flex items-center gap-5 mb-10">
+  <section class="relative flex flex-col items-center text-center gap-5 py-10 md:py-14 mb-10">
+    <!-- Halo decorativo detrás del hero -->
+    <div
+      class="absolute inset-0 -z-10 pointer-events-none"
+      style="background: radial-gradient(600px 320px at 50% 40%, rgba(212,168,76,0.18), transparent 70%);"
+    ></div>
+
     {avatar ? (
       <img
         src={avatar}
         alt={persona}
-        class="w-16 h-16 rounded border border-border"
+        class="hero-avatar w-24 h-24 md:w-28 md:h-28 rounded-2xl border-2 border-accent/40"
         loading="eager"
       />
     ) : null}
-    <div class="flex-1 min-w-0">
-      <h1 class="text-xl font-semibold text-text leading-tight">{persona}</h1>
-      <a
-        href={profileUrl}
-        target="_blank"
-        rel="noopener"
-        class="text-xs text-muted hover:text-accent"
-      >
-        {location ? `${location} · ` : ""}steamcommunity.com/id/{config.steamVanity}
-      </a>
-    </div>
-    <div class="flex gap-8">
-      <div>
-        <div class="stat-value">{all.length}</div>
+
+    <h1 class="flex flex-col items-center gap-2">
+      <span class="hero-title gold-text">Sixbulletss</span>
+      <span class="font-display text-sm md:text-base text-text/70 tracking-[0.5em] uppercase pl-[0.5em]">Store</span>
+    </h1>
+
+    <a
+      href={profileUrl}
+      target="_blank"
+      rel="noopener"
+      class="text-xs uppercase tracking-[0.22em] text-muted hover:text-accent"
+    >
+      {location ? `${location} · ` : ""}steamcommunity.com/id/{config.steamVanity}
+    </a>
+
+    <div class="flex items-center gap-8 mt-2">
+      <div class="text-center">
+        <div class="stat-value text-2xl md:text-3xl">{all.length}</div>
         <div class="stat-label">Items</div>
       </div>
-      <div>
-        <div class="stat-value">{totalPriced}</div>
+      <div class="w-px h-10 bg-white/10"></div>
+      <div class="text-center">
+        <div class="stat-value text-2xl md:text-3xl">{totalPriced}</div>
         <div class="stat-label">Con precio</div>
       </div>
     </div>
