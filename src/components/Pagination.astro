@@ -1,0 +1,52 @@
+---
+interface Props {
+  page: number;
+  totalPages: number;
+  baseUrl: string; // e.g. "/?cat=Rifle&q=ak"
+}
+const { page, totalPages, baseUrl } = Astro.props;
+
+function withPage(p: number): string {
+  const [path, qs = ""] = baseUrl.split("?");
+  const params = new URLSearchParams(qs);
+  params.set("page", String(p));
+  return `${path}?${params.toString()}`;
+}
+
+// Compact page window: 1 ... p-2 p-1 p p+1 p+2 ... last
+function pages(): (number | "…")[] {
+  const out: (number | "…")[] = [];
+  const push = (n: number | "…") => out.push(n);
+  const add = new Set<number>();
+  [1, 2, totalPages - 1, totalPages, page - 1, page, page + 1].forEach((n) => {
+    if (n >= 1 && n <= totalPages) add.add(n);
+  });
+  const sorted = [...add].sort((a, b) => a - b);
+  let prev = 0;
+  for (const n of sorted) {
+    if (n - prev > 1) push("…");
+    push(n);
+    prev = n;
+  }
+  return out;
+}
+---
+
+{totalPages > 1 && (
+  <nav class="flex items-center justify-center gap-1 mt-8 flex-wrap">
+    <a class={`btn ${page <= 1 ? "pointer-events-none opacity-40" : ""}`} href={withPage(Math.max(1, page - 1))}>←</a>
+    {pages().map((n) =>
+      n === "…" ? (
+        <span class="px-2 text-muted">…</span>
+      ) : (
+        <a
+          href={withPage(n)}
+          class={`btn ${n === page ? "chip-active border-accent/60 text-accent bg-accent/15" : ""}`}
+        >
+          {n}
+        </a>
+      ),
+    )}
+    <a class={`btn ${page >= totalPages ? "pointer-events-none opacity-40" : ""}`} href={withPage(Math.min(totalPages, page + 1))}>→</a>
+  </nav>
+)}

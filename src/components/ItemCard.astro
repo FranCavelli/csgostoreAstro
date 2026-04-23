@@ -1,0 +1,58 @@
+---
+import type { StoreItem } from "~/lib/types";
+import { formatMoney, steamIconUrl, itemDetailUrl } from "~/lib/store";
+
+interface Props {
+  item: StoreItem;
+}
+const { item } = Astro.props;
+const img = steamIconUrl(item.iconUrl, 256);
+const rarityColor = item.rarityColor || "#d4a84c";
+const detailUrl = itemDetailUrl(item.marketHashName);
+const slug = encodeURIComponent(item.marketHashName);
+
+const subtitle = [item.quality, item.exterior].filter(Boolean).join(" · ");
+---
+
+<a
+  href={detailUrl}
+  class="item-card card overflow-hidden flex flex-col"
+  title={item.name}
+>
+  <div class="aspect-[5/4] relative">
+    {img ? (
+      <img
+        src={img}
+        alt={item.name}
+        loading="lazy"
+        decoding="async"
+        class="absolute inset-0 w-full h-full object-contain p-3"
+        transition:name={`img-${slug}`}
+      />
+    ) : null}
+    {item.count > 1 ? (
+      <span class="absolute top-2 right-2 text-[11px] text-muted">×{item.count}</span>
+    ) : null}
+  </div>
+
+  <div class="px-3 pb-3 flex flex-col gap-1 border-t border-border/60 pt-2.5">
+    <div class="flex items-center gap-1.5 min-w-0">
+      <span class="rarity-dot shrink-0" style={`--rarity: ${rarityColor}`}></span>
+      <span
+        class="text-[13px] text-text truncate"
+        transition:name={`name-${slug}`}
+      >{item.name}</span>
+    </div>
+    {subtitle ? (
+      <div class="text-[11px] text-muted truncate">{subtitle}</div>
+    ) : null}
+    <div class="mt-1">
+      <span
+        class="text-sm font-semibold text-accent tabular-nums"
+        transition:name={`price-${slug}`}
+      >
+        {formatMoney(item.storePrice)}
+      </span>
+    </div>
+  </div>
+</a>

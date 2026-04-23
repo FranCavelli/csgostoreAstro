@@ -1,0 +1,134 @@
+---
+import Layout from "~/layouts/Layout.astro";
+import ItemCard from "~/components/ItemCard.astro";
+import Pagination from "~/components/Pagination.astro";
+import Filters from "~/components/Filters.astro";
+import {
+  loadInventory,
+  loadPrices,
+  loadProfile,
+  buildStoreItems,
+  filterItems,
+  paginate,
+  collectCategories,
+  collectRarities,
+  config,
+} from "~/lib/store";
+
+const url = Astro.url;
+const category = url.searchParams.get("cat") || "all";
+const rarity = url.searchParams.get("rarity") || "all";
+const q = url.searchParams.get("q") || "";
+const sort = (url.searchParams.get("sort") || "name") as any;
+const page = Number(url.searchParams.get("page") || "1");
+const perPage = 24;
+
+const [inv, prices, profile] = await Promise.all([
+  loadInventory(),
+  loadPrices(),
+  loadProfile(),
+]);
+
+const all = buildStoreItems(inv, prices);
+const categories = collectCategories(all);
+const rarities = collectRarities(all);
+const filtered = filterItems(all, { category, rarity, q, sort });
+const paged = paginate(filtered, page, perPage);
+
+const baseUrl = url.pathname;
+const qs = new URLSearchParams();
+if (category !== "all") qs.set("cat", category);
+if (rarity !== "all") qs.set("rarity", rarity);
+if (q) qs.set("q", q);
+if (sort && sort !== "name") qs.set("sort", sort);
+const pagedBase = qs.toString() ? `${baseUrl}?${qs.toString()}` : baseUrl;
+
+const priceAge = prices.updatedAt
+  ? Math.round((Date.now() - prices.updatedAt) / 60000)
+  : null;
+
+const emptyCache = inv.items.length === 0;
+
+const totalPriced = all.filter((i) => i.storePrice != null).length;
+
+const persona = profile.persona || "Sixbulletss Store";
+const avatar = profile.avatarFull || profile.avatarIcon || "";
+const location = profile.location;
+const profileUrl = `https://steamcommunity.com/id/${config.steamVanity}`;
+---
+
+<Layout title="Sixbulletss Store · CS2 skins">
+  <!-- Hero minimalista -->
+  <section class="flex items-center gap-5 mb-10">
+    {avatar ? (
+      <img
+        src={avatar}
+        alt={persona}
+        class="w-16 h-16 rounded border border-border"
+        loading="eager"
+      />
+    ) : null}
+    <div class="flex-1 min-w-0">
+      <h1 class="text-xl font-semibold text-text leading-tight">{persona}</h1>
+      <a
+        href={profileUrl}
+        target="_blank"
+        rel="noopener"
+        class="text-xs text-muted hover:text-accent"
+      >
+        {location ? `${location} · ` : ""}steamcommunity.com/id/{config.steamVanity}
+      </a>
+    </div>
+    <div class="flex gap-8">
+      <div>
+        <div class="stat-value">{all.length}</div>
+        <div class="stat-label">Items</div>
+      </div>
+      <div>
+        <div class="stat-value">{totalPriced}</div>
+        <div class="stat-label">Con precio</div>
+      </div>
+    </div>
+  </section>
+
+  {emptyCache && (
+    <div class="card p-4 text-sm mb-6">
+      <p class="text-accent">No hay datos todavía.</p>
+      <p class="text-muted mt-1">
+        Corré <code class="text-accent">npm run update</code> para bajar inventario y precios.
+      </p>
+    </div>
+  )}
+
+  <Filters
+    categories={categories}
+    rarities={rarities}
+    category={category}
+    rarity={rarity}
+    q={q}
+    sort={sort}
+    baseUrl={baseUrl}
+  />
+
+  <section class="mt-8">
+    {paged.items.length === 0 ? (
+      <div class="card p-8 text-center text-muted">
+        No hay items que coincidan con el filtro.
+      </div>
+    ) : (
+      <>
+        <div class="flex items-center justify-between mb-4 text-xs text-muted">
+          <span>{paged.total} items</span>
+          <span>
+            {priceAge === null ? "" : `Actualizado hace ${priceAge} min`}
+          </span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          {paged.items.map((it) => <ItemCard item={it} />)}
+        </div>
+      </>
+    )}
+  </section>
+
+  <Pagination page={paged.page} totalPages={paged.totalPages} baseUrl={pagedBase} />
+</Layout>

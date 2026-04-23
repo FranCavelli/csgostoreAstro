@@ -1,0 +1,77 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Despliega en cada push a main
+  push:
+    branches: [main]
+  # Refresca precios + redeploya cada 2 horas
+  schedule:
+    - cron: "0 */2 * * *"
+  # Permite lanzarlo manualmente desde la UI de Actions
+  workflow_dispatch:
+
+# Un solo deploy en vuelo. Si llega otro, cancela el anterior.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm install --no-audit --no-fund
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Fetch inventory + precios + perfil
+        run: npm run update
+        env:
+          STEAM_ID: ${{ vars.STEAM_ID || '76561198262015349' }}
+          STEAM_VANITY: ${{ vars.STEAM_VANITY || 'sixbulletss' }}
+          CURRENCY_ISO: ${{ vars.CURRENCY_ISO || 'ARS' }}
+          STEAM_CURRENCY: ${{ vars.STEAM_CURRENCY || '34' }}
+          MARKET_MULTIPLIER: ${{ vars.MARKET_MULTIPLIER || '1' }}
+          STEAM_MULTIPLIER: ${{ vars.STEAM_MULTIPLIER || '2' }}
+          EXCHANGE_RATE_USD: ${{ vars.EXCHANGE_RATE_USD }}
+
+      - name: Build Astro
+        run: npm run build
+        env:
+          SITE_URL: ${{ steps.pages.outputs.origin }}
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          STEAM_ID: ${{ vars.STEAM_ID || '76561198262015349' }}
+          STEAM_VANITY: ${{ vars.STEAM_VANITY || 'sixbulletss' }}
+          CURRENCY_ISO: ${{ vars.CURRENCY_ISO || 'ARS' }}
+          STEAM_CURRENCY: ${{ vars.STEAM_CURRENCY || '34' }}
+          MARKET_MULTIPLIER: ${{ vars.MARKET_MULTIPLIER || '1' }}
+          STEAM_MULTIPLIER: ${{ vars.STEAM_MULTIPLIER || '2' }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

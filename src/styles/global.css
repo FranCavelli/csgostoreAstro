@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+  }
+  ::selection {
+    background: rgba(212, 168, 76, 0.35);
+    color: #0b0b0d;
+  }
+  a {
+    @apply transition-colors;
+  }
+  a:hover {
+    @apply text-accent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-border rounded-md;
+  }
+  .btn {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded border border-border
+           bg-surface hover:border-accent/50 transition text-sm text-text;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs
+           border border-border text-muted hover:text-text hover:border-accent/40 transition;
+  }
+  .chip-active {
+    @apply border-accent/60 text-accent;
+  }
+  .input {
+    @apply w-full bg-surface border border-border rounded px-3 py-2 text-sm outline-none
+           focus:border-accent/60 transition;
+  }
+  .stat-value {
+    @apply text-xl font-semibold text-text tabular-nums;
+  }
+  .stat-label {
+    @apply text-[11px] uppercase tracking-[0.14em] text-muted;
+  }
+}
+
+.rarity-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--rarity, #d4a84c);
+  display: inline-block;
+}
+
+.item-card {
+  transition: border-color 150ms ease;
+}
+.item-card:hover {
+  border-color: rgba(212, 168, 76, 0.4);
+}
+
+/* Expand-in para la vista de detalle. Se dispara en cada visita (elemento nuevo),
+   en paralelo con el morph de la imagen via view transitions. */
+@keyframes detail-expand {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+    filter: blur(4px);
+  }
+  60% {
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+.detail-expand {
+  animation: detail-expand 420ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  transform-origin: center top;
+}
+.detail-expand--delay {
+  animation-delay: 80ms;
+}

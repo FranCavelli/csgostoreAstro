@@ -1,0 +1,149 @@
+---
+import Layout from "~/layouts/Layout.astro";
+import {
+  loadInventory,
+  loadPrices,
+  buildStoreItems,
+  steamIconUrl,
+  steamMarketUrl,
+  resolveInspectLink,
+  formatMoney,
+  itemSlug,
+  homeUrl,
+  config,
+} from "~/lib/store";
+import type { StoreItem } from "~/lib/types";
+
+// Pre-generamos una página por item al hacer el build (SSG → GitHub Pages).
+export async function getStaticPaths() {
+  const [inv, prices] = await Promise.all([loadInventory(), loadPrices()]);
+  const items = buildStoreItems(inv, prices);
+  return items.map((item) => ({
+    params: { slug: itemSlug(item.marketHashName) },
+    props: { item },
+  }));
+}
+
+interface Props { item: StoreItem }
+const { item } = Astro.props;
+
+const slug = itemSlug(item.marketHashName);
+const img = steamIconUrl(item.iconUrl, 512);
+const rarityColor = item.rarityColor || "#d4a84c";
+
+const marketUrl = steamMarketUrl(item.marketHashName);
+const inspectUrl = resolveInspectLink(
+  item.inspectLinkTemplate,
+  config.steamId,
+  item.assetIds[0],
+);
+
+const priceAge = item.priceUpdatedAt
+  ? Math.round((Date.now() - item.priceUpdatedAt) / 60000)
+  : null;
+
+const showVariation = item.priceSource === "market";
+const variationRows: Array<{ label: string; value: string }> = showVariation
+  ? [
+      { label: "Mínimo", value: formatMoney(item.priceMin) },
+      { label: "Mediana", value: formatMoney(item.priceMedian) },
+      { label: "Promedio", value: formatMoney(item.priceMean) },
+      { label: "Máximo", value: formatMoney(item.priceMax) },
+      { label: "Listados activos", value: String(item.priceQuantity) },
+    ]
+  : item.priceSource === "steam"
+    ? [
+        { label: "Steam (menor)", value: formatMoney(item.sourcePrice) },
+        { label: "Steam (mediana)", value: formatMoney(item.priceMedian) },
+        { label: "Volumen 24h", value: String(item.priceVolume || 0) },
+      ]
+    : [];
+---
+
+<Layout title={`${item.name} · Sixbulletss Store`}>
+  <a href={homeUrl()} class="text-xs text-muted hover:text-accent inline-flex items-center gap-1 mb-6">
+    ← Volver al catálogo
+  </a>
+
+  <div class="grid md:grid-cols-[minmax(0,1fr)_420px] gap-8 items-start">
+    <div class="card overflow-hidden detail-expand">
+      <div class="h-[3px]" style={`background: ${rarityColor}`}></div>
+      <div class="aspect-[5/4] relative">
+        {img ? (
+          <img
+            src={img}
+            alt={item.name}
+            class="absolute inset-0 w-full h-full object-contain p-8"
+            transition:name={`img-${slug}`}
+          />
+        ) : null}
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-6 detail-expand detail-expand--delay">
+      <div>
+        <div class="flex flex-wrap items-center gap-2 text-xs text-muted mb-1">
+          <span class="rarity-dot" style={`--rarity: ${rarityColor}`}></span>
+          <span style={`color: ${rarityColor}`}>{item.rarity ?? "—"}</span>
+          {item.exterior ? <span>· {item.exterior}</span> : null}
+          {item.quality ? <span>· {item.quality}</span> : null}
+          {item.count > 1 ? <span>· ×{item.count} en stock</span> : null}
+        </div>
+        <h1
+          class="text-2xl font-semibold leading-tight"
+          transition:name={`name-${slug}`}
+        >{item.name}</h1>
+      </div>
+
+      <div>
+        <div class="stat-label mb-1">Precio</div>
+        <div
+          class="text-3xl font-semibold text-accent tabular-nums"
+          transition:name={`price-${slug}`}
+        >
+          {formatMoney(item.storePrice)}
+        </div>
+        {item.priceSource === "steam" && item.sourcePrice != null && (
+          <div class="text-xs text-muted mt-1">
+            Precio Steam: {formatMoney(item.sourcePrice)} · ×{item.priceMultiplier}
+          </div>
+        )}
+        {item.priceSource === "none" && (
+          <div class="text-xs text-muted mt-1">Sin precio disponible</div>
+        )}
+      </div>
+
+      {variationRows.length > 0 && (
+        <div>
+          <div class="stat-label mb-2">Variación del mercado</div>
+          <div class="card divide-y divide-border">
+            {variationRows.map((r) => (
+              <div class="flex items-center justify-between px-4 py-2 text-sm">
+                <span class="text-muted">{r.label}</span>
+                <span class="tabular-nums">{r.value}</span>
+              </div>
+            ))}
+          </div>
+          {priceAge !== null && (
+            <div class="text-[11px] text-muted mt-2">
+              Actualizado hace {priceAge} min
+            </div>
+          )}
+        </div>
+      )}
+
+      <div class="flex flex-wrap gap-2">
+        <a href={marketUrl} target="_blank" rel="noopener" class="btn">
+          Ver en Steam ↗
+        </a>
+        {inspectUrl ? (
+          <a href={inspectUrl} class="btn">Ver en el juego ↗</a>
+        ) : (
+          <span class="btn opacity-40 cursor-not-allowed" title="No disponible">
+            Ver en el juego
+          </span>
+        )}
+      </div>
+    </div>
+  </div>
+</Layout>

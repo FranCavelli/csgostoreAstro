@@ -1,0 +1,65 @@
+---
+import "~/styles/global.css";
+import { ClientRouter } from "astro:transitions";
+import { config } from "~/lib/config";
+import { loadProfile, homeUrl } from "~/lib/store";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+const { title = "Sixbulletss Store", description = "Tienda de skins CS2" } = Astro.props;
+const profileUrl = `https://steamcommunity.com/id/${config.steamVanity}`;
+
+const profile = await loadProfile();
+const favicon = profile.avatarIcon || profile.avatarFull || "/favicon.svg";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="icon" href={favicon} />
+    <link rel="preconnect" href="https://community.cloudflare.steamstatic.com" crossorigin />
+    <link rel="preconnect" href="https://avatars.fastly.steamstatic.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>{title}</title>
+    <ClientRouter />
+  </head>
+  <body>
+    <header class="border-b border-border">
+      <div class="max-w-6xl mx-auto px-5 py-4 flex items-center gap-4">
+        <a href={homeUrl()} class="flex items-center gap-3">
+          {profile.avatarIcon ? (
+            <img src={profile.avatarIcon} alt="" class="w-7 h-7 rounded" />
+          ) : null}
+          <span class="text-sm font-medium tracking-wide">Sixbulletss Store</span>
+        </a>
+        <nav class="ml-auto">
+          <a
+            class="text-sm text-muted hover:text-accent"
+            href={profileUrl}
+            target="_blank"
+            rel="noopener"
+          >Perfil Steam ↗</a>
+        </nav>
+      </div>
+    </header>
+    <main class="max-w-6xl mx-auto px-5 py-8">
+      <slot />
+    </main>
+    <footer class="max-w-6xl mx-auto px-5 py-10 text-xs text-muted">
+      <div class="border-t border-border pt-4 flex items-center justify-between">
+        <span>steamcommunity.com/id/{config.steamVanity}</span>
+        <span>Precios orientativos · sujetos a variación del mercado</span>
+      </div>
+    </footer>
+  </body>
+</html>

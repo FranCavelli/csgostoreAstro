@@ -1,0 +1,75 @@
+---
+interface Category { name: string; count: number }
+interface Rarity { name: string; color: string | null; count: number }
+interface Props {
+  categories: Category[];
+  rarities: Rarity[];
+  category: string;
+  rarity: string;
+  q: string;
+  sort: string;
+  baseUrl: string;
+}
+const { categories, rarities, category, rarity, q, sort, baseUrl } = Astro.props;
+
+function link(params: Record<string, string>): string {
+  const qs = new URLSearchParams();
+  if (params.cat && params.cat !== "all") qs.set("cat", params.cat);
+  if (params.rarity && params.rarity !== "all") qs.set("rarity", params.rarity);
+  if (params.q) qs.set("q", params.q);
+  if (params.sort && params.sort !== "name") qs.set("sort", params.sort);
+  const s = qs.toString();
+  return s ? `${baseUrl}?${s}` : baseUrl;
+}
+
+const totalCount = categories.reduce((s, c) => s + c.count, 0);
+---
+
+<form method="get" action={baseUrl} class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-center gap-2">
+    <input
+      type="search"
+      name="q"
+      value={q}
+      placeholder="Buscar…"
+      class="input max-w-xs"
+    />
+    <select name="sort" class="input max-w-[170px]" onchange="this.form.requestSubmit()">
+      <option value="name" selected={sort === "name"}>Nombre</option>
+      <option value="price-asc" selected={sort === "price-asc"}>Precio ↑</option>
+      <option value="price-desc" selected={sort === "price-desc"}>Precio ↓</option>
+      <option value="rarity" selected={sort === "rarity"}>Rareza</option>
+    </select>
+    {rarity !== "all" ? <input type="hidden" name="rarity" value={rarity} /> : null}
+    {category !== "all" ? <input type="hidden" name="cat" value={category} /> : null}
+  </div>
+
+  <div class="flex flex-wrap gap-1.5">
+    <a
+      class={`chip ${category === "all" ? "chip-active" : ""}`}
+      href={link({ cat: "all", rarity, q, sort })}
+    >Todas <span class="opacity-60">· {totalCount}</span></a>
+    {categories.map((c) => (
+      <a
+        class={`chip ${category === c.name ? "chip-active" : ""}`}
+        href={link({ cat: c.name, rarity, q, sort })}
+      >{c.name} <span class="opacity-60">· {c.count}</span></a>
+    ))}
+  </div>
+
+  {rarities.length > 0 && (
+    <div class="flex flex-wrap gap-1.5">
+      <a
+        class={`chip ${rarity === "all" ? "chip-active" : ""}`}
+        href={link({ cat: category, rarity: "all", q, sort })}
+      >Cualquier rareza</a>
+      {rarities.map((r) => (
+        <a
+          class={`chip ${rarity === r.name ? "chip-active" : ""}`}
+          style={r.color ? `border-color: ${r.color}55; color: ${r.color}` : ""}
+          href={link({ cat: category, rarity: r.name, q, sort })}
+        >{r.name} <span class="opacity-60">· {r.count}</span></a>
+      ))}
+    </div>
+  )}
+</form>
