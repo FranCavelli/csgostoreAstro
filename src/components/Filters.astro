@@ -12,6 +12,9 @@ interface Props {
 }
 const { categories, rarities, category, rarity, q, sort, baseUrl } = Astro.props;
 
+// Links "semánticos" — el JS del index.astro intercepta el click y actualiza
+// la URL vía history.pushState. Sin JS, los links siguen funcionando pero
+// el sitio es estático así que no van a filtrar nada.
 function link(params: Record<string, string>): string {
   const qs = new URLSearchParams();
   if (params.cat && params.cat !== "all") qs.set("cat", params.cat);
@@ -25,7 +28,7 @@ function link(params: Record<string, string>): string {
 const totalCount = categories.reduce((s, c) => s + c.count, 0);
 ---
 
-<form method="get" action={baseUrl} class="flex flex-col gap-4">
+<form method="get" action={baseUrl} data-filters class="flex flex-col gap-4">
   <div class="flex flex-wrap items-center gap-2">
     <input
       type="search"
@@ -47,11 +50,15 @@ const totalCount = categories.reduce((s, c) => s + c.count, 0);
   <div class="flex flex-wrap gap-1.5">
     <a
       class={`chip ${category === "all" ? "chip-active" : ""}`}
+      data-filter="cat"
+      data-value="all"
       href={link({ cat: "all", rarity, q, sort })}
     >Todas <span class="opacity-60">· {totalCount}</span></a>
     {categories.map((c) => (
       <a
         class={`chip ${category === c.name ? "chip-active" : ""}`}
+        data-filter="cat"
+        data-value={c.name}
         href={link({ cat: c.name, rarity, q, sort })}
       >{c.name} <span class="opacity-60">· {c.count}</span></a>
     ))}
@@ -61,11 +68,15 @@ const totalCount = categories.reduce((s, c) => s + c.count, 0);
     <div class="flex flex-wrap gap-1.5">
       <a
         class={`chip ${rarity === "all" ? "chip-active" : ""}`}
+        data-filter="rarity"
+        data-value="all"
         href={link({ cat: category, rarity: "all", q, sort })}
       >Cualquier rareza</a>
       {rarities.map((r) => (
         <a
           class={`chip ${rarity === r.name ? "chip-active" : ""}`}
+          data-filter="rarity"
+          data-value={r.name}
           style={r.color ? `border-color: ${r.color}55; color: ${r.color}` : ""}
           href={link({ cat: category, rarity: r.name, q, sort })}
         >{r.name} <span class="opacity-60">· {r.count}</span></a>

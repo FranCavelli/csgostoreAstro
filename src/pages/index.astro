@@ -1,64 +1,40 @@
 ---
 import Layout from "~/layouts/Layout.astro";
-import ItemCard from "~/components/ItemCard.astro";
-import Pagination from "~/components/Pagination.astro";
 import Filters from "~/components/Filters.astro";
 import {
   loadInventory,
   loadPrices,
   loadProfile,
   buildStoreItems,
-  filterItems,
-  paginate,
   collectCategories,
   collectRarities,
+  homeUrl,
   config,
 } from "~/lib/store";
-
-const url = Astro.url;
-const category = url.searchParams.get("cat") || "all";
-const rarity = url.searchParams.get("rarity") || "all";
-const q = url.searchParams.get("q") || "";
-const sort = (url.searchParams.get("sort") || "name") as any;
-const page = Number(url.searchParams.get("page") || "1");
-const perPage = 24;
 
 const [inv, prices, profile] = await Promise.all([
   loadInventory(),
   loadPrices(),
   loadProfile(),
 ]);
-
 const all = buildStoreItems(inv, prices);
 const categories = collectCategories(all);
 const rarities = collectRarities(all);
-const filtered = filterItems(all, { category, rarity, q, sort });
-const paged = paginate(filtered, page, perPage);
 
-const baseUrl = url.pathname;
-const qs = new URLSearchParams();
-if (category !== "all") qs.set("cat", category);
-if (rarity !== "all") qs.set("rarity", rarity);
-if (q) qs.set("q", q);
-if (sort && sort !== "name") qs.set("sort", sort);
-const pagedBase = qs.toString() ? `${baseUrl}?${qs.toString()}` : baseUrl;
-
+const totalPriced = all.filter((i) => i.storePrice != null).length;
 const priceAge = prices.updatedAt
   ? Math.round((Date.now() - prices.updatedAt) / 60000)
   : null;
-
-const emptyCache = inv.items.length === 0;
-
-const totalPriced = all.filter((i) => i.storePrice != null).length;
 
 const persona = profile.persona || "Sixbulletss Store";
 const avatar = profile.avatarFull || profile.avatarIcon || "";
 const location = profile.location;
 const profileUrl = `https://steamcommunity.com/id/${config.steamVanity}`;
+
+const emptyCache = all.length === 0;
 ---
 
 <Layout title="Sixbulletss Store · CS2 skins">
-  <!-- Hero minimalista -->
   <section class="flex items-center gap-5 mb-10">
     {avatar ? (
       <img
@@ -103,32 +79,254 @@ const profileUrl = `https://steamcommunity.com/id/${config.steamVanity}`;
   <Filters
     categories={categories}
     rarities={rarities}
-    category={category}
-    rarity={rarity}
-    q={q}
-    sort={sort}
-    baseUrl={baseUrl}
+    category="all"
+    rarity="all"
+    q=""
+    sort="name"
+    baseUrl={homeUrl()}
   />
 
-  <section class="mt-8">
-    {paged.items.length === 0 ? (
-      <div class="card p-8 text-center text-muted">
-        No hay items que coincidan con el filtro.
-      </div>
-    ) : (
-      <>
-        <div class="flex items-center justify-between mb-4 text-xs text-muted">
-          <span>{paged.total} items</span>
-          <span>
-            {priceAge === null ? "" : `Actualizado hace ${priceAge} min`}
-          </span>
-        </div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {paged.items.map((it) => <ItemCard item={it} />)}
-        </div>
-      </>
-    )}
+  <section class="mt-8" id="catalog" data-catalog>
+    <div class="flex items-center justify-between mb-4 text-xs text-muted">
+      <span id="summary">Cargando items…</span>
+      <span>{priceAge === null ? "" : `Actualizado hace ${priceAge} min`}</span>
+    </div>
+    <div
+      id="grid"
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
+    ></div>
+    <div id="empty" class="card p-8 text-center text-muted hidden">
+      No hay items que coincidan con el filtro.
+    </div>
+    <nav id="pagination" class="flex items-center justify-center gap-1 mt-8 flex-wrap"></nav>
   </section>
 
-  <Pagination page={paged.page} totalPages={paged.totalPages} baseUrl={pagedBase} />
+  <script is:inline define:vars={{ ITEMS_URL: import.meta.env.BASE_URL + "items.json" }}>
+    // Estado global en window para sobrevivir re-ejecuciones de ClientRouter.
+    window.sixstore = window.sixstore || { data: null, perPage: 24 };
+    const S = window.sixstore;
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function readState() {
+      const q = new URLSearchParams(location.search);
+      return {
+        cat: q.get("cat") || "all",
+        rarity: q.get("rarity") || "all",
+        q: q.get("q") || "",
+        sort: q.get("sort") || "name",
+        page: Math.max(1, parseInt(q.get("page") || "1", 10) || 1),
+      };
+    }
+
+    function writeState(next) {
+      const q = new URLSearchParams();
+      if (next.cat !== "all") q.set("cat", next.cat);
+      if (next.rarity !== "all") q.set("rarity", next.rarity);
+      if (next.q) q.set("q", next.q);
+      if (next.sort !== "name") q.set("sort", next.sort);
+      if (next.page !== 1) q.set("page", String(next.page));
+      const url = location.pathname + (q.toString() ? "?" + q.toString() : "");
+      history.replaceState(null, "", url);
+    }
+
+    function filterSort(items, s) {
+      const needle = s.q.trim().toLowerCase();
+      let out = items.filter((it) => {
+        if (s.cat !== "all" && it.category !== s.cat) return false;
+        if (s.rarity !== "all" && it.rarity !== s.rarity) return false;
+        if (needle && !it.name.toLowerCase().includes(needle)) return false;
+        return true;
+      });
+      const pk = (it) => (it.price == null ? Infinity : it.price);
+      if (s.sort === "price-asc") out.sort((a, b) => pk(a) - pk(b));
+      else if (s.sort === "price-desc") out.sort((a, b) => pk(b) - pk(a));
+      else if (s.sort === "rarity")
+        out.sort(
+          (a, b) =>
+            (a.rarity || "").localeCompare(b.rarity || "") || a.name.localeCompare(b.name),
+        );
+      else out.sort((a, b) => a.name.localeCompare(b.name));
+      return out;
+    }
+
+    function cardHtml(it) {
+      const rar = it.rarityColor || "#d4a84c";
+      const subtitle = [it.quality, it.exterior].filter(Boolean).join(" · ");
+      const countBadge =
+        it.count > 1
+          ? `<span class="absolute top-2 right-2 text-[11px] text-muted">×${it.count}</span>`
+          : "";
+      const imgTag = it.icon
+        ? `<img src="${escapeHtml(it.icon)}" alt="${escapeHtml(it.name)}" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-contain p-3" style="view-transition-name: img-${it.slug}">`
+        : "";
+      const subtitleHtml = subtitle
+        ? `<div class="text-[11px] text-muted truncate">${escapeHtml(subtitle)}</div>`
+        : "";
+      return (
+        `<a href="${escapeHtml(it.href)}" class="item-card card overflow-hidden flex flex-col" title="${escapeHtml(it.name)}">` +
+        `<div class="aspect-[5/4] relative">${imgTag}${countBadge}</div>` +
+        `<div class="px-3 pb-3 flex flex-col gap-1 border-t border-border/60 pt-2.5">` +
+        `<div class="flex items-center gap-1.5 min-w-0">` +
+        `<span class="rarity-dot shrink-0" style="--rarity: ${rar}"></span>` +
+        `<span class="text-[13px] text-text truncate" style="view-transition-name: name-${it.slug}">${escapeHtml(it.name)}</span>` +
+        `</div>${subtitleHtml}` +
+        `<div class="mt-1"><span class="text-sm font-semibold text-accent tabular-nums" style="view-transition-name: price-${it.slug}">${escapeHtml(it.priceFmt)}</span></div>` +
+        `</div></a>`
+      );
+    }
+
+    function pageWindow(page, total) {
+      const out = [];
+      const add = new Set();
+      [1, 2, total - 1, total, page - 1, page, page + 1].forEach((n) => {
+        if (n >= 1 && n <= total) add.add(n);
+      });
+      const sorted = [...add].sort((a, b) => a - b);
+      let prev = 0;
+      for (const n of sorted) {
+        if (n - prev > 1) out.push("…");
+        out.push(n);
+        prev = n;
+      }
+      return out;
+    }
+
+    function paginationHtml(page, totalPages) {
+      if (totalPages <= 1) return "";
+      const prev = Math.max(1, page - 1);
+      const next = Math.min(totalPages, page + 1);
+      const disPrev = page <= 1 ? "pointer-events-none opacity-40" : "";
+      const disNext = page >= totalPages ? "pointer-events-none opacity-40" : "";
+      const pages = pageWindow(page, totalPages)
+        .map((n) =>
+          n === "…"
+            ? `<span class="px-2 text-muted">…</span>`
+            : `<button type="button" class="btn ${n === page ? "chip-active border-accent/60 text-accent bg-accent/15" : ""}" data-goto="${n}">${n}</button>`,
+        )
+        .join("");
+      return (
+        `<button type="button" class="btn ${disPrev}" data-goto="${prev}">←</button>` +
+        pages +
+        `<button type="button" class="btn ${disNext}" data-goto="${next}">→</button>`
+      );
+    }
+
+    function render() {
+      const catalog = document.querySelector("[data-catalog]");
+      if (!catalog || !S.data) return;
+
+      const state = readState();
+      const filtered = filterSort(S.data.items, state);
+      const totalPages = Math.max(1, Math.ceil(filtered.length / S.perPage));
+      const page = Math.min(Math.max(1, state.page), totalPages);
+      if (page !== state.page) writeState({ ...state, page });
+
+      const slice = filtered.slice((page - 1) * S.perPage, page * S.perPage);
+      const grid = document.getElementById("grid");
+      const empty = document.getElementById("empty");
+      const summary = document.getElementById("summary");
+      const pager = document.getElementById("pagination");
+
+      if (filtered.length === 0) {
+        grid.innerHTML = "";
+        empty.classList.remove("hidden");
+        summary.textContent = `0 items · página ${page} / ${totalPages}`;
+        pager.innerHTML = "";
+      } else {
+        empty.classList.add("hidden");
+        grid.innerHTML = slice.map(cardHtml).join("");
+        summary.textContent = `${filtered.length} items · página ${page} / ${totalPages}`;
+        pager.innerHTML = paginationHtml(page, totalPages);
+      }
+
+      // Reflejar estado en chips/form (en caso de que la URL cambió externamente).
+      document.querySelectorAll(".chip[data-filter]").forEach((a) => {
+        const kind = a.dataset.filter;
+        const val = a.dataset.value || "all";
+        a.classList.toggle("chip-active", state[kind] === val);
+      });
+      const form = document.querySelector("form[data-filters]");
+      if (form) {
+        const s = form.querySelector('input[name="q"]');
+        const srt = form.querySelector('select[name="sort"]');
+        if (s && s.value !== state.q) s.value = state.q;
+        if (srt && srt.value !== state.sort) srt.value = state.sort;
+      }
+    }
+
+    function update(partial, { resetPage = true } = {}) {
+      const state = readState();
+      const next = { ...state, ...partial };
+      if (resetPage) next.page = 1;
+      writeState(next);
+      render();
+    }
+
+    // Listeners globales — se atan una sola vez al primer boot.
+    if (!window.sixstoreBooted) {
+      window.sixstoreBooted = true;
+
+      document.addEventListener(
+        "submit",
+        (e) => {
+          const form = e.target.closest("form[data-filters]");
+          if (!form) return;
+          e.preventDefault();
+          const fd = new FormData(form);
+          update({ q: String(fd.get("q") || ""), sort: String(fd.get("sort") || "name") });
+        },
+        true,
+      );
+
+      document.addEventListener(
+        "click",
+        (e) => {
+          const chip = e.target.closest(".chip[data-filter]");
+          if (!chip) return;
+          e.preventDefault();
+          e.stopPropagation();
+          update({ [chip.dataset.filter]: chip.dataset.value || "all" });
+        },
+        true,
+      );
+
+      document.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-goto]");
+        if (!btn) return;
+        const p = parseInt(btn.dataset.goto, 10) || 1;
+        update({ page: p }, { resetPage: false });
+        const cat = document.getElementById("catalog");
+        if (cat) window.scrollTo({ top: cat.offsetTop - 20, behavior: "smooth" });
+      });
+    }
+
+    async function boot() {
+      // Sólo hace algo si existe el catálogo en la página actual.
+      if (!document.querySelector("[data-catalog]")) return;
+      if (!S.data) {
+        try {
+          const r = await fetch(ITEMS_URL, { credentials: "omit" });
+          S.data = await r.json();
+        } catch (err) {
+          const sum = document.getElementById("summary");
+          if (sum) sum.textContent = "Error cargando items: " + err.message;
+          return;
+        }
+      }
+      render();
+    }
+
+    boot();
+
+    // Re-render después de navegaciones del ClientRouter (si volvemos al catálogo).
+    document.addEventListener("astro:page-load", boot);
+  </script>
 </Layout>
