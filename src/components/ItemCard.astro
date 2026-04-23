@@ -10,13 +10,13 @@ const img = steamIconUrl(item.iconUrl, 256);
 const rarityColor = item.rarityColor || "#d4a84c";
 const detailUrl = itemDetailUrl(item.marketHashName);
 const slug = encodeURIComponent(item.marketHashName);
-
 const subtitle = [item.quality, item.exterior].filter(Boolean).join(" · ");
 ---
 
 <a
   href={detailUrl}
-  class="item-card card overflow-hidden flex flex-col"
+  class="item-card card flex flex-col overflow-hidden"
+  style={`--rarity: ${rarityColor}`}
   title={item.name}
 >
   <div class="aspect-[5/4] relative">
@@ -31,28 +31,25 @@ const subtitle = [item.quality, item.exterior].filter(Boolean).join(" · ");
       />
     ) : null}
     {item.count > 1 ? (
-      <span class="absolute top-2 right-2 text-[11px] text-muted">×{item.count}</span>
+      <span class="absolute top-2 right-2 text-[11px] text-muted px-1.5 py-0.5 rounded bg-black/40 backdrop-blur">
+        ×{item.count}
+      </span>
     ) : null}
   </div>
 
-  <div class="px-3 pb-3 flex flex-col gap-1 border-t border-border/60 pt-2.5">
-    <div class="flex items-center gap-1.5 min-w-0">
-      <span class="rarity-dot shrink-0" style={`--rarity: ${rarityColor}`}></span>
-      <span
-        class="text-[13px] text-text truncate"
-        transition:name={`name-${slug}`}
-      >{item.name}</span>
-    </div>
+  <div class="px-3.5 pb-3 pt-2.5 flex flex-col gap-0.5">
+    <span
+      class="text-[13px] text-text truncate"
+      transition:name={`name-${slug}`}
+    >{item.name}</span>
     {subtitle ? (
-      <div class="text-[11px] text-muted truncate">{subtitle}</div>
+      <span class="text-[11px] text-muted truncate">{subtitle}</span>
     ) : null}
-    <div class="mt-1">
-      <span
-        class="text-sm font-semibold text-accent tabular-nums"
-        transition:name={`price-${slug}`}
-      >
-        {formatMoney(item.storePrice)}
-      </span>
-    </div>
+    <span
+      class="text-sm font-semibold text-accent tabular-nums mt-1"
+      transition:name={`price-${slug}`}
+    >
+      {formatMoney(item.storePrice)}
+    </span>
   </div>
 </a>

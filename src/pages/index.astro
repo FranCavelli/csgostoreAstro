@@ -162,23 +162,21 @@ const emptyCache = all.length === 0;
       const subtitle = [it.quality, it.exterior].filter(Boolean).join(" · ");
       const countBadge =
         it.count > 1
-          ? `<span class="absolute top-2 right-2 text-[11px] text-muted">×${it.count}</span>`
+          ? `<span class="absolute top-2 right-2 text-[11px] text-muted px-1.5 py-0.5 rounded bg-black/40 backdrop-blur">×${it.count}</span>`
           : "";
       const imgTag = it.icon
         ? `<img src="${escapeHtml(it.icon)}" alt="${escapeHtml(it.name)}" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-contain p-3" style="view-transition-name: img-${it.slug}">`
         : "";
       const subtitleHtml = subtitle
-        ? `<div class="text-[11px] text-muted truncate">${escapeHtml(subtitle)}</div>`
+        ? `<span class="text-[11px] text-muted truncate">${escapeHtml(subtitle)}</span>`
         : "";
       return (
-        `<a href="${escapeHtml(it.href)}" class="item-card card overflow-hidden flex flex-col" title="${escapeHtml(it.name)}">` +
+        `<a href="${escapeHtml(it.href)}" class="item-card card flex flex-col overflow-hidden" style="--rarity: ${rar}" title="${escapeHtml(it.name)}">` +
         `<div class="aspect-[5/4] relative">${imgTag}${countBadge}</div>` +
-        `<div class="px-3 pb-3 flex flex-col gap-1 border-t border-border/60 pt-2.5">` +
-        `<div class="flex items-center gap-1.5 min-w-0">` +
-        `<span class="rarity-dot shrink-0" style="--rarity: ${rar}"></span>` +
+        `<div class="px-3.5 pb-3 pt-2.5 flex flex-col gap-0.5">` +
         `<span class="text-[13px] text-text truncate" style="view-transition-name: name-${it.slug}">${escapeHtml(it.name)}</span>` +
-        `</div>${subtitleHtml}` +
-        `<div class="mt-1"><span class="text-sm font-semibold text-accent tabular-nums" style="view-transition-name: price-${it.slug}">${escapeHtml(it.priceFmt)}</span></div>` +
+        subtitleHtml +
+        `<span class="text-sm font-semibold text-accent tabular-nums mt-1" style="view-transition-name: price-${it.slug}">${escapeHtml(it.priceFmt)}</span>` +
         `</div></a>`
       );
     }

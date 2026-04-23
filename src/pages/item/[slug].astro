@@ -14,7 +14,6 @@ import {
 } from "~/lib/store";
 import type { StoreItem } from "~/lib/types";
 
-// Pre-generamos una página por item al hacer el build (SSG → GitHub Pages).
 export async function getStaticPaths() {
   const [inv, prices] = await Promise.all([loadInventory(), loadPrices()]);
   const items = buildStoreItems(inv, prices);
@@ -66,8 +65,11 @@ const variationRows: Array<{ label: string; value: string }> = showVariation
   </a>
 
   <div class="grid md:grid-cols-[minmax(0,1fr)_420px] gap-8 items-start">
-    <div class="card overflow-hidden detail-expand">
-      <div class="h-[3px]" style={`background: ${rarityColor}`}></div>
+    <!-- Imagen grande con borde de rareza -->
+    <div
+      class="item-card card overflow-hidden detail-expand"
+      style={`--rarity: ${rarityColor}`}
+    >
       <div class="aspect-[5/4] relative">
         {img ? (
           <img
@@ -80,10 +82,14 @@ const variationRows: Array<{ label: string; value: string }> = showVariation
       </div>
     </div>
 
+    <!-- Detalle con expand animado -->
     <div class="flex flex-col gap-6 detail-expand detail-expand--delay">
       <div>
-        <div class="flex flex-wrap items-center gap-2 text-xs text-muted mb-1">
-          <span class="rarity-dot" style={`--rarity: ${rarityColor}`}></span>
+        <div class="flex flex-wrap items-center gap-2 text-xs text-muted mb-2">
+          <span
+            class="inline-block w-1.5 h-1.5 rounded-full"
+            style={`background: ${rarityColor}`}
+          ></span>
           <span style={`color: ${rarityColor}`}>{item.rarity ?? "—"}</span>
           {item.exterior ? <span>· {item.exterior}</span> : null}
           {item.quality ? <span>· {item.quality}</span> : null}
@@ -116,9 +122,9 @@ const variationRows: Array<{ label: string; value: string }> = showVariation
       {variationRows.length > 0 && (
         <div>
           <div class="stat-label mb-2">Variación del mercado</div>
-          <div class="card divide-y divide-border">
+          <div class="card divide-y divide-white/5 overflow-hidden">
             {variationRows.map((r) => (
-              <div class="flex items-center justify-between px-4 py-2 text-sm">
+              <div class="flex items-center justify-between px-4 py-2.5 text-sm">
                 <span class="text-muted">{r.label}</span>
                 <span class="tabular-nums">{r.value}</span>
               </div>

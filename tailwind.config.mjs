@@ -4,16 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: "#0b0b0d",
-        surface: "#141315",
+        bg: "#0a0a0c",
+        surface: "#141214",
         surface2: "#1c1a1c",
         border: "#2a2724",
         muted: "#8a8276",
-        text: "#e6dccb",
-        accent: "#d4a84c", // dorado del león — único color de énfasis
+        text: "#e8dccb",
+        accent: "#d4a84c",
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+      },
+      borderRadius: {
+        xl2: "14px",
       },
     },
   },

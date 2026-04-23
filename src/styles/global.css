@@ -7,11 +7,18 @@
     color-scheme: dark;
   }
   body {
-    @apply bg-bg text-text font-sans antialiased;
+    @apply text-text font-sans antialiased;
+    background-color: #0a0a0c;
+    /* Orbes dorados suaves — lo que el efecto vidrio va a "revelar" */
+    background-image:
+      radial-gradient(700px 420px at 8% -5%, rgba(212, 168, 76, 0.14), transparent 60%),
+      radial-gradient(520px 420px at 92% 15%, rgba(212, 168, 76, 0.08), transparent 60%),
+      radial-gradient(800px 600px at 50% 110%, rgba(212, 168, 76, 0.06), transparent 60%);
+    background-attachment: fixed;
   }
   ::selection {
     background: rgba(212, 168, 76, 0.35);
-    color: #0b0b0d;
+    color: #0a0a0c;
   }
   a {
     @apply transition-colors;
@@ -22,54 +29,115 @@
 }
 
 @layer components {
+  /* Vidrio esmerilado: translúcido + blur + borde sutil */
+  .glass {
+    background: rgba(20, 18, 20, 0.55);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .glass-soft {
+    background: rgba(20, 18, 20, 0.38);
+    backdrop-filter: blur(10px) saturate(130%);
+    -webkit-backdrop-filter: blur(10px) saturate(130%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
   .card {
-    @apply bg-surface border border-border rounded-md;
+    @apply glass rounded-xl2;
   }
+
   .btn {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded border border-border
-           bg-surface hover:border-accent/50 transition text-sm text-text;
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-text transition;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
+  .btn:hover {
+    border-color: rgba(212, 168, 76, 0.45);
+    color: var(--tw-color-accent, #d4a84c);
+  }
+
   .chip {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs
-           border border-border text-muted hover:text-text hover:border-accent/40 transition;
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs text-muted transition;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .chip:hover {
+    color: #e8dccb;
+    border-color: rgba(212, 168, 76, 0.35);
   }
   .chip-active {
-    @apply border-accent/60 text-accent;
+    color: #d4a84c !important;
+    border-color: rgba(212, 168, 76, 0.6) !important;
+    background: rgba(212, 168, 76, 0.08);
   }
+
   .input {
-    @apply w-full bg-surface border border-border rounded px-3 py-2 text-sm outline-none
-           focus:border-accent/60 transition;
+    @apply w-full rounded-lg px-3 py-2 text-sm outline-none transition;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
+  .input:focus {
+    border-color: rgba(212, 168, 76, 0.55);
+    box-shadow: 0 0 0 3px rgba(212, 168, 76, 0.12);
+  }
+
   .stat-value {
     @apply text-xl font-semibold text-text tabular-nums;
   }
   .stat-label {
-    @apply text-[11px] uppercase tracking-[0.14em] text-muted;
+    @apply text-[11px] uppercase tracking-[0.16em] text-muted;
   }
 }
 
-.rarity-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: var(--rarity, #d4a84c);
-  display: inline-block;
-}
-
+/* ──────────────────────────────────────────────────────────────
+   Card de item con borde coloreado por rareza (via --rarity).
+   El color se setea inline desde cada card.
+   ────────────────────────────────────────────────────────────── */
 .item-card {
-  transition: border-color 150ms ease;
+  --rarity: #d4a84c;
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--rarity) 28%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 20px 40px -24px rgba(0, 0, 0, 0.8);
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+.item-card::before {
+  /* Línea superior con el color de rareza más saturado */
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--rarity) 85%, transparent) 0%,
+    color-mix(in srgb, var(--rarity) 10%, transparent) 100%
+  );
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  pointer-events: none;
 }
 .item-card:hover {
-  border-color: rgba(212, 168, 76, 0.4);
+  border-color: color-mix(in srgb, var(--rarity) 75%, transparent);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--rarity) 50%, transparent),
+    0 28px 50px -24px rgba(0, 0, 0, 0.9);
 }
 
-/* Expand-in para la vista de detalle. Se dispara en cada visita (elemento nuevo),
-   en paralelo con el morph de la imagen via view transitions. */
+/* Expand-in para la vista de detalle */
 @keyframes detail-expand {
   0% {
     opacity: 0;
-    transform: scale(0.92) translateY(8px);
-    filter: blur(4px);
+    transform: scale(0.94) translateY(6px);
+    filter: blur(6px);
   }
   60% {
     filter: blur(0);
