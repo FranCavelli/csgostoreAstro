@@ -8,16 +8,18 @@
   }
   body {
     @apply text-text font-sans antialiased;
-    background-color: #0a0a0c;
-    /* Orbes dorados suaves — lo que el efecto vidrio va a "revelar" */
+    /* Fondo más vivo — es lo que el glass va a reflejar/difuminar. Sin esto el efecto
+       se pierde: el vidrio necesita algo "atrás" para sentirse traslúcido. */
+    background-color: #080709;
     background-image:
-      radial-gradient(700px 420px at 8% -5%, rgba(212, 168, 76, 0.14), transparent 60%),
-      radial-gradient(520px 420px at 92% 15%, rgba(212, 168, 76, 0.08), transparent 60%),
-      radial-gradient(800px 600px at 50% 110%, rgba(212, 168, 76, 0.06), transparent 60%);
+      radial-gradient(650px 500px at 12% -8%, rgba(212, 168, 76, 0.28), transparent 60%),
+      radial-gradient(520px 520px at 92% 18%, rgba(180, 131, 50, 0.18), transparent 60%),
+      radial-gradient(780px 640px at 50% 115%, rgba(212, 168, 76, 0.12), transparent 60%),
+      radial-gradient(400px 300px at 80% 60%, rgba(240, 201, 107, 0.08), transparent 70%);
     background-attachment: fixed;
   }
   ::selection {
-    background: rgba(212, 168, 76, 0.35);
+    background: rgba(212, 168, 76, 0.4);
     color: #0a0a0c;
   }
   a {
@@ -29,63 +31,87 @@
 }
 
 @layer components {
-  /* Vidrio esmerilado: translúcido + blur + borde sutil */
+  /* ──────────────────────────────────────────────────────────────
+     Glass: tint blanco muy sutil + borde iluminado + blur + halo
+     interno arriba. Adaptado al tema oscuro — el "brillo" viene del
+     borde claro y del highlight interno, no del fondo.
+     ────────────────────────────────────────────────────────────── */
   .glass {
-    background: rgba(20, 18, 20, 0.55);
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.09) 0%,
+        rgba(255, 255, 255, 0.02) 45%,
+        rgba(255, 255, 255, 0.05) 100%
+      ),
+      rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(14px) saturate(140%);
     -webkit-backdrop-filter: blur(14px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1.5px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+      0 20px 40px -20px rgba(0, 0, 0, 0.7);
   }
+
   .glass-soft {
-    background: rgba(20, 18, 20, 0.38);
+    background: rgba(255, 255, 255, 0.04);
     backdrop-filter: blur(10px) saturate(130%);
     -webkit-backdrop-filter: blur(10px) saturate(130%);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .card {
-    @apply glass rounded-xl2;
+    @apply rounded-xl2 glass;
   }
 
   .btn {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-text transition;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    @apply inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm text-text transition;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+      rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
   .btn:hover {
-    border-color: rgba(212, 168, 76, 0.45);
-    color: var(--tw-color-accent, #d4a84c);
+    border-color: rgba(212, 168, 76, 0.5);
+    color: #f0c96b;
   }
 
   .chip {
     @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs text-muted transition;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
   .chip:hover {
     color: #e8dccb;
-    border-color: rgba(212, 168, 76, 0.35);
+    border-color: rgba(212, 168, 76, 0.45);
   }
   .chip-active {
-    color: #d4a84c !important;
+    color: #f0c96b !important;
     border-color: rgba(212, 168, 76, 0.6) !important;
-    background: rgba(212, 168, 76, 0.08);
+    background: rgba(212, 168, 76, 0.12) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 20px -8px rgba(212, 168, 76, 0.4);
   }
 
   .input {
-    @apply w-full rounded-lg px-3 py-2 text-sm outline-none transition;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    @apply w-full rounded-lg px-3.5 py-2 text-sm outline-none transition;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
   .input:focus {
     border-color: rgba(212, 168, 76, 0.55);
-    box-shadow: 0 0 0 3px rgba(212, 168, 76, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 3px rgba(212, 168, 76, 0.15);
   }
 
   .stat-value {
@@ -97,27 +123,28 @@
 }
 
 /* ──────────────────────────────────────────────────────────────
-   Card de item con borde coloreado por rareza (via --rarity).
-   El color se setea inline desde cada card.
+   Item-card: glass + borde iluminado por rareza + strip superior.
+   Hereda .card (glass) y sobreescribe el border-color y la sombra
+   con el color de rareza vía --rarity.
    ────────────────────────────────────────────────────────────── */
 .item-card {
   --rarity: #d4a84c;
   position: relative;
-  border: 1px solid color-mix(in srgb, var(--rarity) 28%, transparent);
+  border-color: color-mix(in srgb, var(--rarity) 35%, rgba(255, 255, 255, 0.14));
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.03) inset,
-    0 20px 40px -24px rgba(0, 0, 0, 0.8);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    0 20px 40px -24px rgba(0, 0, 0, 0.85);
   transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 .item-card::before {
-  /* Línea superior con el color de rareza más saturado */
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--rarity) 85%, transparent) 0%,
+    color-mix(in srgb, var(--rarity) 90%, transparent) 0%,
     color-mix(in srgb, var(--rarity) 10%, transparent) 100%
   );
   border-top-left-radius: inherit;
@@ -125,14 +152,16 @@
   pointer-events: none;
 }
 .item-card:hover {
-  border-color: color-mix(in srgb, var(--rarity) 75%, transparent);
-  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--rarity) 85%, transparent);
+  transform: translateY(-3px);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--rarity) 50%, transparent),
-    0 28px 50px -24px rgba(0, 0, 0, 0.9);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 0 0 1px color-mix(in srgb, var(--rarity) 55%, transparent),
+    0 0 40px -12px color-mix(in srgb, var(--rarity) 60%, transparent),
+    0 32px 56px -24px rgba(0, 0, 0, 0.95);
 }
 
-/* Expand-in para la vista de detalle */
+/* Expand-in del detalle */
 @keyframes detail-expand {
   0% {
     opacity: 0;
