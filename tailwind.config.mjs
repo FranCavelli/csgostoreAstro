@@ -14,7 +14,7 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
-        display: ["'Fraunces'", "'Recoleta'", "Georgia", "serif"],
+        display: ["'Unbounded'", "'Space Grotesk'", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       borderRadius: {
         xl2: "14px",
