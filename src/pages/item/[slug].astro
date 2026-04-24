@@ -62,6 +62,7 @@ const variationRows: Array<{ label: string; value: string }> = showVariation
 <Layout title={`${item.name} · Sixbulletss Store`}>
   <a
     href={homeUrl()}
+    data-back-catalog
     class="text-xs text-muted hover:text-accent inline-flex items-center gap-1 mb-6"
   >
     ← Volver al catálogo
@@ -72,6 +73,7 @@ const variationRows: Array<{ label: string; value: string }> = showVariation
     <div
       class="item-card card overflow-hidden detail-expand"
       style={`--rarity: ${rarityColor}`}
+      transition:name="detail-primary"
     >
       <div class="aspect-[5/4] relative">
         {img ? (
@@ -86,7 +88,10 @@ const variationRows: Array<{ label: string; value: string }> = showVariation
     </div>
 
     <!-- Detalle con expand animado -->
-    <div class="flex flex-col gap-6 detail-expand detail-expand--delay">
+    <div
+      class="flex flex-col gap-6 detail-expand detail-expand--delay"
+      transition:name="detail-sidebar"
+    >
       <div>
         <div class="flex flex-wrap items-center gap-2 text-xs text-muted mb-2">
           <span
@@ -155,4 +160,19 @@ const variationRows: Array<{ label: string; value: string }> = showVariation
       </div>
     </div>
   </div>
+
+  <script is:inline define:vars={{ HOME_URL: homeUrl() }}>
+    // Restaura los filtros/paginación del catálogo en el link "Volver".
+    // El valor lo guarda index.astro al hacer click en una card.
+    function wireBackLink() {
+      const back = document.querySelector("[data-back-catalog]");
+      if (!back) return;
+      try {
+        const saved = sessionStorage.getItem("sixstore:catalog-query");
+        if (saved) back.href = HOME_URL + saved;
+      } catch {}
+    }
+    wireBackLink();
+    document.addEventListener("astro:page-load", wireBackLink);
+  </script>
 </Layout>

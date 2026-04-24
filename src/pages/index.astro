@@ -310,6 +310,21 @@ const emptyCache = all.length === 0;
         const cat = document.getElementById("catalog");
         if (cat) window.scrollTo({ top: cat.offsetTop - 20, behavior: "smooth" });
       });
+
+      // Guarda el estado del catálogo (filtros + página + scroll) al entrar
+      // a un item, para que el link "Volver al catálogo" pueda restaurarlo.
+      document.addEventListener(
+        "click",
+        (e) => {
+          const card = e.target.closest("a.item-card");
+          if (!card) return;
+          try {
+            sessionStorage.setItem("sixstore:catalog-query", location.search);
+            sessionStorage.setItem("sixstore:catalog-scroll", String(window.scrollY));
+          } catch {}
+        },
+        true,
+      );
     }
 
     async function boot() {
@@ -326,6 +341,18 @@ const emptyCache = all.length === 0;
         }
       }
       render();
+
+      // Si venimos de un item y la URL del catálogo coincide con la que
+      // estaba guardada, restaurar la posición de scroll. Se consume para
+      // que no vuelva a saltar en navegaciones posteriores.
+      try {
+        const savedScroll = sessionStorage.getItem("sixstore:catalog-scroll");
+        const savedQuery = sessionStorage.getItem("sixstore:catalog-query");
+        if (savedScroll !== null && savedQuery === location.search) {
+          window.scrollTo(0, parseInt(savedScroll, 10) || 0);
+          sessionStorage.removeItem("sixstore:catalog-scroll");
+        }
+      } catch {}
     }
 
     boot();
