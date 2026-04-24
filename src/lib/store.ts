@@ -94,8 +94,7 @@ export function buildStoreItems(
   for (const it of inventory.items) {
     const p = pricesFile.prices[it.marketHashName];
     const sourcePrice = p?.price ?? null;
-    const mult =
-      p?.source === "steam" ? config.steamMultiplier : config.marketMultiplier;
+    const mult = config.marketMultiplier;
     const storePrice = sourcePrice != null ? round2(sourcePrice * mult) : null;
 
     out.push({

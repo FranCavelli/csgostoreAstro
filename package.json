@@ -9,8 +9,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "update": "node scripts/update-inventory.mjs --once",
-    "updater": "node scripts/update-inventory.mjs --watch",
+    "update": "node --env-file-if-exists=.env scripts/update-inventory.mjs --once",
+    "updater": "node --env-file-if-exists=.env scripts/update-inventory.mjs --watch",
     "update:build": "npm run update && npm run build"
   },
   "dependencies": {

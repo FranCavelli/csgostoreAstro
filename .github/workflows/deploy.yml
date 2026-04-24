@@ -42,11 +42,12 @@ jobs:
         env:
           STEAM_ID: ${{ vars.STEAM_ID || '76561198262015349' }}
           STEAM_VANITY: ${{ vars.STEAM_VANITY || 'sixbulletss' }}
-          CURRENCY_ISO: ${{ vars.CURRENCY_ISO || 'ARS' }}
-          STEAM_CURRENCY: ${{ vars.STEAM_CURRENCY || '34' }}
+          CURRENCY_ISO: ${{ vars.CURRENCY_ISO || 'USD' }}
+          STEAM_CURRENCY: ${{ vars.STEAM_CURRENCY || '1' }}
           MARKET_MULTIPLIER: ${{ vars.MARKET_MULTIPLIER || '1' }}
-          STEAM_MULTIPLIER: ${{ vars.STEAM_MULTIPLIER || '2' }}
           EXCHANGE_RATE_USD: ${{ vars.EXCHANGE_RATE_USD }}
+          CSGOEMPIRE_API_KEY: ${{ secrets.CSGOEMPIRE_API_KEY }}
+          EMPIRE_USD_DIVISOR: ${{ vars.EMPIRE_USD_DIVISOR || '100' }}
 
       - name: Build Astro
         run: npm run build
@@ -55,10 +56,9 @@ jobs:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
           STEAM_ID: ${{ vars.STEAM_ID || '76561198262015349' }}
           STEAM_VANITY: ${{ vars.STEAM_VANITY || 'sixbulletss' }}
-          CURRENCY_ISO: ${{ vars.CURRENCY_ISO || 'ARS' }}
-          STEAM_CURRENCY: ${{ vars.STEAM_CURRENCY || '34' }}
+          CURRENCY_ISO: ${{ vars.CURRENCY_ISO || 'USD' }}
+          STEAM_CURRENCY: ${{ vars.STEAM_CURRENCY || '1' }}
           MARKET_MULTIPLIER: ${{ vars.MARKET_MULTIPLIER || '1' }}
-          STEAM_MULTIPLIER: ${{ vars.STEAM_MULTIPLIER || '2' }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

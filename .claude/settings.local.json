@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.csgoempire.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(node --env-file=.env -e ' *)",
+      "Bash(npm run *)",
+      "Bash(node *)"
+    ]
+  }
+}
