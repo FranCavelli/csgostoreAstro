@@ -37,6 +37,11 @@ const CFG = {
   empireDelayMs: Number(process.env.EMPIRE_REQUEST_DELAY_MS || 1500),
   // Espera entre pasadas consecutivas cuando la primera muere por rate-limit.
   empireSecondPassWaitMs: Number(process.env.EMPIRE_SECOND_PASS_WAIT_MS || 60000),
+  // Mínimo de listings que tiene que tener Empire para confiar en su precio.
+  // Con 1-2 listings es común encontrar outliers muy arriba del precio real
+  // (trade-up bait, etc). Debajo del umbral, se va a pedir precio a Steam y
+  // se usa Empire sólo si Steam falla.
+  empireMinListingsTrust: Number(process.env.EMPIRE_MIN_LISTINGS_TRUST || 3),
   ua: "Mozilla/5.0 (sixstore-updater)",
 };
 
@@ -361,40 +366,51 @@ async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
   const conv = (v) => (typeof v === "number" ? round2(v * rate) : null);
   const toUsd = (coinCents) => coinCents / CFG.empireUsdDivisor;
 
+  const empireEntry = (s) => ({
+    source: "market",
+    price: conv(toUsd(s.min)),
+    min: conv(toUsd(s.min)),
+    max: conv(toUsd(s.max)),
+    median: conv(toUsd(s.median)),
+    mean: conv(toUsd(s.mean)),
+    quantity: s.count,
+    updatedAt: Date.now(),
+  });
+
   const out = {};
-  const missing = [];
+  // `missing` ahora incluye también items con Empire pero con muy pocos
+  // listings — para esos, Empire es el "último recurso" si Steam no responde.
+  const missing = []; // [{ hash, empireFallback?: entry }]
   let hits = 0;
+  let empireUntrusted = 0;
 
   for (const it of inventory.items) {
     const s = empireStats.get(it.marketHashName);
-    if (s && Number.isFinite(s.min)) {
-      out[it.marketHashName] = {
-        source: "market",
-        price: conv(toUsd(s.min)),
-        min: conv(toUsd(s.min)),
-        max: conv(toUsd(s.max)),
-        median: conv(toUsd(s.median)),
-        mean: conv(toUsd(s.mean)),
-        quantity: s.count,
-        updatedAt: Date.now(),
-      };
+    if (s && Number.isFinite(s.min) && s.count >= CFG.empireMinListingsTrust) {
+      out[it.marketHashName] = empireEntry(s);
       hits++;
+    } else if (s && Number.isFinite(s.min)) {
+      // Empire tiene listing pero con pocos listings → desconfiamos, Steam manda
+      missing.push({ hash: it.marketHashName, empireFallback: empireEntry(s) });
+      empireUntrusted++;
     } else {
-      missing.push(it.marketHashName);
+      missing.push({ hash: it.marketHashName, empireFallback: null });
     }
   }
 
-  log(`CSGOEmpire → con precio ${hits} · sin precio ${missing.length}`);
+  log(
+    `CSGOEmpire → trusted ${hits} · desconfiables (<${CFG.empireMinListingsTrust} listings) ${empireUntrusted} · sin listing ${missing.length - empireUntrusted}`,
+  );
 
   // Fallback Steam con TTL para no repedir los mismos items cada corrida
   const ttlMs = CFG.steamFallbackTtlMin * 60_000;
   const now = Date.now();
-  let refreshed = 0, reused = 0, failed = 0, stale = 0;
+  let refreshed = 0, reused = 0, failed = 0, stale = 0, empireRescued = 0;
   let consecFails = 0;
   let breakerTripped = false;
 
   for (let i = 0; i < missing.length; i++) {
-    const hash = missing[i];
+    const { hash, empireFallback } = missing[i];
     const prev = prevPrices?.prices?.[hash];
 
     // Reuso dentro del TTL: no molestamos a Steam.
@@ -409,16 +425,27 @@ async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
       continue;
     }
 
-    // Circuit breaker: si Steam nos rompe N veces seguidas, salteamos el
-    // resto de la pasada y dejamos que la próxima corrida lo reintente.
-    // Los items que tenían precio Steam previo (aunque vencido) se mantienen.
-    if (breakerTripped) {
+    // Helper: cuando no tenemos Steam, preferimos Steam-previo-vencido >
+    // Empire-untrusted > dejar sin precio. Empire con pocos listings es
+    // el último recurso porque tiende a ser outlier.
+    const useBestFallback = () => {
       if (prev?.source === "steam" && prev.price != null) {
         out[hash] = prev;
         stale++;
-      } else {
-        failed++;
+        return;
       }
+      if (empireFallback) {
+        out[hash] = empireFallback;
+        empireRescued++;
+        return;
+      }
+      failed++;
+    };
+
+    // Circuit breaker: si Steam nos rompe N veces seguidas, salteamos el
+    // resto de la pasada y dejamos que la próxima corrida lo reintente.
+    if (breakerTripped) {
+      useBestFallback();
       continue;
     }
 
@@ -435,21 +462,13 @@ async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
         };
         refreshed++;
         consecFails = 0;
-      } else if (prev?.source === "steam" && prev.price != null) {
-        // Steam respondió pero sin datos útiles → mantenemos el previo
-        out[hash] = prev;
-        stale++;
       } else {
-        failed++;
+        // Steam respondió pero sin datos → usamos el mejor fallback
+        useBestFallback();
       }
     } catch (err) {
       consecFails++;
-      if (prev?.source === "steam" && prev.price != null) {
-        out[hash] = prev;
-        stale++;
-      } else {
-        failed++;
-      }
+      useBestFallback();
       log(`  steam error "${hash}" (${consecFails} seguidos):`, err.message);
       if (consecFails >= CFG.steamBreakerThreshold) {
         log(`  Steam tiró ${consecFails} errores seguidos — corto fallback, reuso precios previos`);
@@ -457,7 +476,7 @@ async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
       }
     }
 
-    if ((refreshed + failed + stale) % 25 === 0 && (refreshed + failed + stale) > 0) {
+    if ((refreshed + failed + stale + empireRescued) % 25 === 0 && (refreshed + failed + stale + empireRescued) > 0) {
       await writeAtomic(PRICES_FILE, {
         currency: iso, usdToCurrencyRate: rate, updatedAt: Date.now(), prices: out,
       });
@@ -465,7 +484,9 @@ async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
     await sleep(CFG.steamDelayMs);
   }
 
-  log(`Fallback Steam → refresh ${refreshed} · reuse ${reused} · stale ${stale} · sin precio ${failed}`);
+  log(
+    `Fallback → steam refresh ${refreshed} · steam reuse ${reused} · steam stale ${stale} · empire untrusted rescatados ${empireRescued} · sin precio ${failed}`,
+  );
   return { currency: iso, usdToCurrencyRate: rate, updatedAt: Date.now(), prices: out };
 }
 
