@@ -9,7 +9,14 @@
       "Bash(node *)",
       "Read(//c/Program Files/**)",
       "Bash(command -v gh.exe)",
-      "Bash(grep -E --line-buffered \"Segundo pase|rescató|CSGOEmpire →|OK$|Error|falló\")"
+      "Bash(grep -E --line-buffered \"Segundo pase|rescató|CSGOEmpire →|OK$|Error|falló\")",
+      "Bash(grep -E \"Segundo pase|rescató|CSGOEmpire →|OK$\" \"C:\\\\Users\\\\FranC\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-FranC-OneDrive-Escritorio-sixstore\\\\871229cc-8a99-4bb9-adf6-371496158779\\\\tasks\\\\b2vhe7k65.output\")",
+      "Bash(grep -E \"CSGOEmpire →|Fallback Steam|OK$|Run falló\")",
+      "Bash(rm lion.png)",
+      "Bash(mv lion-opt.png lion.png)",
+      "Read(//c/c/Users/FranC/OneDrive/Escritorio/sixstore/**)",
+      "Bash(grep -E \"CSGOEmpire →|Fallback Steam|OK$|error|falló\")",
+      "Bash(grep -E --line-buffered \"CSGOEmpire →|Fallback Steam|OK$|Error|Run falló|steam error\")"
     ]
   }
 }

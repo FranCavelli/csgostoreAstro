@@ -27,7 +27,7 @@ const priceAge = prices.updatedAt
   : null;
 
 const persona = profile.persona || "Sixbulletss Store";
-const avatar = profile.avatarFull || profile.avatarIcon || "";
+const avatar = `${import.meta.env.BASE_URL}lion.webp`;
 const location = profile.location;
 const profileUrl = `https://steamcommunity.com/id/${config.steamVanity}`;
 
@@ -35,7 +35,7 @@ const emptyCache = all.length === 0;
 ---
 
 <Layout title="Sixbulletss Store · CS2 skins">
-  <section class="relative flex flex-col items-center text-center gap-5 py-10 md:py-14 mb-10">
+  <section class="relative flex flex-col items-center text-center gap-4 py-10 md:py-14 mb-10">
     <!-- Halo decorativo detrás del hero -->
     <div
       class="absolute inset-0 -z-10 pointer-events-none"
@@ -46,7 +46,7 @@ const emptyCache = all.length === 0;
       <img
         src={avatar}
         alt={persona}
-        class="hero-avatar w-24 h-24 md:w-28 md:h-28 rounded-2xl border-2 border-accent/40"
+        class="w-20 sm:w-24 md:w-28"
         loading="eager"
       />
     ) : null}

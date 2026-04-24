@@ -5,11 +5,10 @@
 //   - Steam inventory (paginado)
 //   - Steam profile (XML)
 //   - Precios desde CSGOEmpire (pagina el mercado una sola vez)
+//   - Steam Market como fallback para items que CSGOEmpire no lista (con TTL)
 //   - Exchange rate USD → moneda destino (solo si CURRENCY_ISO != USD)
-// Items que CSGOEmpire no lista quedan sin entrada en prices.json y la UI
-// los muestra sin precio.
 
-import { writeFile, rename, mkdir, stat } from "node:fs/promises";
+import { readFile, writeFile, rename, mkdir, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -28,6 +27,8 @@ const CFG = {
   currencyIso: (process.env.CURRENCY_ISO || "USD").toUpperCase(),
   manualRate: process.env.EXCHANGE_RATE_USD ? Number(process.env.EXCHANGE_RATE_USD) : null,
   intervalMin: Number(process.env.UPDATE_INTERVAL_MINUTES || 30),
+  steamFallbackTtlMin: Number(process.env.STEAM_FALLBACK_TTL_MINUTES || 720),
+  steamDelayMs: Number(process.env.STEAM_REQUEST_DELAY_MS || 1500),
   empireApiKey: process.env.CSGOEMPIRE_API_KEY || "",
   empireUsdDivisor: Number(process.env.EMPIRE_USD_DIVISOR || 100),
   empireDelayMs: Number(process.env.EMPIRE_REQUEST_DELAY_MS || 1500),
@@ -44,6 +45,10 @@ async function writeAtomic(path, data) {
   const tmp = `${path}.tmp`;
   await writeFile(tmp, JSON.stringify(data), "utf8");
   await rename(tmp, path);
+}
+
+async function readJsonIfExists(path, fallback) {
+  try { return JSON.parse(await readFile(path, "utf8")); } catch { return fallback; }
 }
 
 async function fetchWithBackoff(url, { attempts = 5, headers = {}, initialWait = 2000, maxWait = 30000 } = {}) {
@@ -234,52 +239,6 @@ async function fetchEmpireMarket(wantedSet) {
   }
   log(`CSGOEmpire total: ${total} listings scanned · ${values.size}/${wantedSet.size} items con listings`);
 
-  // Segundo pase: la paginación de CSGOEmpire a veces saltea items cuando hay
-  // muchos con el mismo market_value. Para los faltantes hacemos search directo.
-  const missing = [...wantedSet].filter((n) => !values.has(n));
-  if (missing.length) {
-    log(`Segundo pase: search directo para ${missing.length} items sin match`);
-    let rescued = 0;
-    for (let i = 0; i < missing.length; i++) {
-      const name = missing[i];
-      const sp = new URLSearchParams({
-        per_page: "100",
-        page: "1",
-        search: name,
-        order: "market_value",
-        sort: "asc",
-      });
-      const url = `https://csgoempire.com/api/v2/trading/items?${sp.toString()}`;
-      try {
-        const res = await fetchWithBackoff(url, {
-          headers: {
-            Authorization: `Bearer ${CFG.empireApiKey}`,
-            Accept: "application/json",
-          },
-          attempts: 5,
-          initialWait: 3000,
-          maxWait: 30000,
-        });
-        const data = await res.json();
-        const list = Array.isArray(data?.data) ? data.data : [];
-        const matches = list.filter(
-          (it) => it?.market_name === name && typeof it.market_value === "number",
-        );
-        if (matches.length) {
-          values.set(name, matches.map((m) => m.market_value));
-          rescued++;
-        }
-      } catch (err) {
-        log(`  search error "${name}":`, err.message);
-      }
-      if ((i + 1) % 25 === 0) {
-        log(`  search ${i + 1}/${missing.length} (rescued ${rescued})`);
-      }
-      await sleep(CFG.empireDelayMs);
-    }
-    log(`Segundo pase → rescató ${rescued}/${missing.length} items`);
-  }
-
   // Collapse a stats por market_name
   const stats = new Map();
   for (const [name, arr] of values) {
@@ -311,17 +270,46 @@ async function fetchUsdRate(iso) {
   return rate;
 }
 
-// --- Build prices ------------------------------------------------------------
-// Solo precios de CSGOEmpire. Items no listados quedan sin entrada → la UI
-// muestra "—" (ver formatMoney).
+// --- Steam Market (fallback) -------------------------------------------------
 
-function buildPrices(inventory, empireStats, rate, iso) {
+function parseMoney(str) {
+  if (!str || typeof str !== "string") return null;
+  const cleaned = str.replace(/[^0-9.,]/g, "");
+  if (!cleaned) return null;
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  let normalized;
+  if (lastComma === -1 && lastDot === -1) normalized = cleaned;
+  else if (lastComma > lastDot) normalized = cleaned.replace(/\./g, "").replace(",", ".");
+  else normalized = cleaned.replace(/,/g, "");
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function fetchSteamPriceUsd(hashName) {
+  // Steam rate-limitea fuerte. Fail fast: 2 intentos, wait corto. Los items
+  // que fallen ahora los rescatamos en la próxima corrida (TTL cache los mantiene).
+  const url = `https://steamcommunity.com/market/priceoverview/?appid=${CFG.appId}&currency=1&market_hash_name=${encodeURIComponent(hashName)}`;
+  const res = await fetchWithBackoff(url, { attempts: 2, initialWait: 1500, maxWait: 3000 });
+  const data = await res.json();
+  if (!data?.success) return null;
+  return {
+    lowest: parseMoney(data.lowest_price),
+    median: parseMoney(data.median_price),
+    volume: data.volume ? Number(String(data.volume).replace(/[^0-9]/g, "")) : 0,
+  };
+}
+
+// --- Build prices ------------------------------------------------------------
+// CSGOEmpire primero; Steam Market como fallback para items sin listing.
+
+async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
   const conv = (v) => (typeof v === "number" ? round2(v * rate) : null);
   const toUsd = (coinCents) => coinCents / CFG.empireUsdDivisor;
 
   const out = {};
+  const missing = [];
   let hits = 0;
-  let miss = 0;
 
   for (const it of inventory.items) {
     const s = empireStats.get(it.marketHashName);
@@ -338,11 +326,58 @@ function buildPrices(inventory, empireStats, rate, iso) {
       };
       hits++;
     } else {
-      miss++;
+      missing.push(it.marketHashName);
     }
   }
 
-  log(`CSGOEmpire → con precio ${hits} · sin precio ${miss}`);
+  log(`CSGOEmpire → con precio ${hits} · sin precio ${missing.length}`);
+
+  // Fallback Steam con TTL para no repedir los mismos items cada corrida
+  const ttlMs = CFG.steamFallbackTtlMin * 60_000;
+  const now = Date.now();
+  let refreshed = 0, reused = 0, failed = 0;
+
+  for (let i = 0; i < missing.length; i++) {
+    const hash = missing[i];
+    const prev = prevPrices?.prices?.[hash];
+    if (
+      prev?.source === "steam" &&
+      prev.updatedAt &&
+      now - prev.updatedAt < ttlMs &&
+      prev.price != null
+    ) {
+      out[hash] = prev;
+      reused++;
+      continue;
+    }
+    try {
+      const p = await fetchSteamPriceUsd(hash);
+      if (p && (p.lowest != null || p.median != null)) {
+        const base = p.lowest ?? p.median;
+        out[hash] = {
+          source: "steam",
+          price: conv(base),
+          median: conv(p.median),
+          volume: p.volume ?? 0,
+          updatedAt: Date.now(),
+        };
+        refreshed++;
+      } else {
+        failed++;
+      }
+    } catch (err) {
+      failed++;
+      log(`  steam error "${hash}":`, err.message);
+    }
+    if ((refreshed + failed) % 25 === 0 && (refreshed + failed) > 0) {
+      await writeAtomic(PRICES_FILE, {
+        currency: iso, usdToCurrencyRate: rate, updatedAt: Date.now(), prices: out,
+      });
+    }
+    await sleep(CFG.steamDelayMs);
+  }
+
+  log(`Fallback Steam → refresh ${refreshed} · reuse ${reused} · sin precio ${failed}`);
   return { currency: iso, usdToCurrencyRate: rate, updatedAt: Date.now(), prices: out };
 }
 
@@ -365,11 +400,12 @@ async function runOnce() {
   await writeAtomic(INVENTORY_FILE, inventory);
 
   const wantedSet = new Set(inventory.items.map((it) => it.marketHashName));
+  const prevPrices = await readJsonIfExists(PRICES_FILE, null);
   const [empireStats, rate] = await Promise.all([
     fetchEmpireMarket(wantedSet),
     fetchUsdRate(CFG.currencyIso),
   ]);
-  const prices = buildPrices(inventory, empireStats, rate, CFG.currencyIso);
+  const prices = await buildPrices(inventory, empireStats, prevPrices, rate, CFG.currencyIso);
   await writeAtomic(PRICES_FILE, prices);
   log(`OK`);
 }

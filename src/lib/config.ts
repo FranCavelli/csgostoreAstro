@@ -11,6 +11,9 @@ export const config = {
   appId: process.env.STEAM_APP_ID || "730",
   // Markup sobre el precio de CSGOEmpire. 1 = sin markup.
   marketMultiplier: num(process.env.MARKET_MULTIPLIER, 1),
+  // Markup sobre el precio de Steam (fallback). Steam ya viene con sus fees
+  // incluidas en el lowest_price, así que por default 1.
+  steamMultiplier: num(process.env.STEAM_MULTIPLIER, 1),
   currencyCode: num(process.env.STEAM_CURRENCY, 1),
   currencyIso: (process.env.CURRENCY_ISO || "USD").toUpperCase(),
   updateIntervalMinutes: num(process.env.UPDATE_INTERVAL_MINUTES, 30),

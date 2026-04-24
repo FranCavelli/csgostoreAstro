@@ -37,6 +37,17 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
 
+      # Restaura data/cache de runs anteriores → el TTL de Steam rescata
+      # items sin re-pedirle a Steam (que nos rate-limitea fuerte).
+      # Guardar es automático al final del job.
+      - name: Restore price cache
+        uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: prices-${{ github.run_id }}
+          restore-keys: |
+            prices-
+
       - name: Fetch inventory + precios + perfil
         run: npm run update
         env:
@@ -45,9 +56,11 @@ jobs:
           CURRENCY_ISO: ${{ vars.CURRENCY_ISO || 'USD' }}
           STEAM_CURRENCY: ${{ vars.STEAM_CURRENCY || '1' }}
           MARKET_MULTIPLIER: ${{ vars.MARKET_MULTIPLIER || '1' }}
+          STEAM_MULTIPLIER: ${{ vars.STEAM_MULTIPLIER || '1' }}
           EXCHANGE_RATE_USD: ${{ vars.EXCHANGE_RATE_USD }}
           CSGOEMPIRE_API_KEY: ${{ secrets.CSGOEMPIRE_API_KEY }}
           EMPIRE_USD_DIVISOR: ${{ vars.EMPIRE_USD_DIVISOR || '100' }}
+          STEAM_FALLBACK_TTL_MINUTES: ${{ vars.STEAM_FALLBACK_TTL_MINUTES || '720' }}
 
       - name: Build Astro
         run: npm run build
@@ -59,6 +72,7 @@ jobs:
           CURRENCY_ISO: ${{ vars.CURRENCY_ISO || 'USD' }}
           STEAM_CURRENCY: ${{ vars.STEAM_CURRENCY || '1' }}
           MARKET_MULTIPLIER: ${{ vars.MARKET_MULTIPLIER || '1' }}
+          STEAM_MULTIPLIER: ${{ vars.STEAM_MULTIPLIER || '1' }}
           DISCORD_URL: ${{ vars.DISCORD_URL }}
           KICK_USERNAME: ${{ vars.KICK_USERNAME || 'sixbulletss' }}
 
