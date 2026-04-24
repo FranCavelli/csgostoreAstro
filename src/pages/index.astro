@@ -21,11 +21,6 @@ const all = buildStoreItems(inv, prices);
 const categories = collectCategories(all);
 const rarities = collectRarities(all);
 
-const totalPriced = all.filter((i) => i.storePrice != null).length;
-const priceAge = prices.updatedAt
-  ? Math.round((Date.now() - prices.updatedAt) / 60000)
-  : null;
-
 const persona = profile.persona || "Sixbulletss Store";
 const avatar = `${import.meta.env.BASE_URL}lion.webp`;
 const location = profile.location;
@@ -95,7 +90,7 @@ const emptyCache = all.length === 0;
   <section class="mt-8" id="catalog" data-catalog>
     <div class="flex items-center justify-between mb-4 text-xs text-muted">
       <span id="summary">Cargando items…</span>
-      <span>{priceAge === null ? "" : `Actualizado hace ${priceAge} min`}</span>
+      <span id="price-age"></span>
     </div>
     <div
       id="grid"
@@ -119,6 +114,23 @@ const emptyCache = all.length === 0;
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+    }
+
+    function formatAge(ms) {
+      if (!Number.isFinite(ms) || ms < 0) return "";
+      const m = Math.floor(ms / 60000);
+      if (m < 1) return "hace menos de 1 min";
+      if (m < 60) return `hace ${m} min`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `hace ${h} h`;
+      const d = Math.floor(h / 24);
+      return `hace ${d} d`;
+    }
+
+    function updatePriceAge() {
+      const el = document.getElementById("price-age");
+      if (!el || !S.data?.updatedAt) return;
+      el.textContent = "Actualizado " + formatAge(Date.now() - S.data.updatedAt);
     }
 
     function readState() {
@@ -341,6 +353,11 @@ const emptyCache = all.length === 0;
         }
       }
       render();
+      updatePriceAge();
+      if (!window.sixstoreAgeTick) {
+        // Refresca el "hace X min" cada 30s sin recargar.
+        window.sixstoreAgeTick = setInterval(updatePriceAge, 30_000);
+      }
 
       // Si venimos de un item y la URL del catálogo coincide con la que
       // estaba guardada, restaurar la posición de scroll. Se consume para

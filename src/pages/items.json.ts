@@ -35,7 +35,17 @@ export const GET: APIRoute = async () => {
   const categories = collectCategories(all);
   const rarities = collectRarities(all);
 
-  return new Response(JSON.stringify({ items, categories, rarities }), {
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({
+      items,
+      categories,
+      rarities,
+      // Timestamp real del último fetch de precios. El cliente lo usa para
+      // mostrar "hace X min" en vivo (el valor server-side queda baked en
+      // el HTML y en GH Pages siempre dice ~0 porque el build corre justo
+      // después del fetch).
+      updatedAt: prices.updatedAt || null,
+    }),
+    { headers: { "Content-Type": "application/json" } },
+  );
 };

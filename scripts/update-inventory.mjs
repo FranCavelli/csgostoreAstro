@@ -27,11 +27,16 @@ const CFG = {
   currencyIso: (process.env.CURRENCY_ISO || "USD").toUpperCase(),
   manualRate: process.env.EXCHANGE_RATE_USD ? Number(process.env.EXCHANGE_RATE_USD) : null,
   intervalMin: Number(process.env.UPDATE_INTERVAL_MINUTES || 30),
-  steamFallbackTtlMin: Number(process.env.STEAM_FALLBACK_TTL_MINUTES || 720),
-  steamDelayMs: Number(process.env.STEAM_REQUEST_DELAY_MS || 1500),
+  steamFallbackTtlMin: Number(process.env.STEAM_FALLBACK_TTL_MINUTES || 2880),
+  steamDelayMs: Number(process.env.STEAM_REQUEST_DELAY_MS || 3000),
+  // Cuántos 429/errores seguidos de Steam cortan la pasada de fallback
+  // en una corrida (evita quemar 20 min cuando Steam bloquea la IP).
+  steamBreakerThreshold: Number(process.env.STEAM_BREAKER_THRESHOLD || 8),
   empireApiKey: process.env.CSGOEMPIRE_API_KEY || "",
   empireUsdDivisor: Number(process.env.EMPIRE_USD_DIVISOR || 100),
   empireDelayMs: Number(process.env.EMPIRE_REQUEST_DELAY_MS || 1500),
+  // Espera entre pasadas consecutivas cuando la primera muere por rate-limit.
+  empireSecondPassWaitMs: Number(process.env.EMPIRE_SECOND_PASS_WAIT_MS || 60000),
   ua: "Mozilla/5.0 (sixstore-updater)",
 };
 
@@ -53,29 +58,41 @@ async function readJsonIfExists(path, fallback) {
 
 async function fetchWithBackoff(url, { attempts = 5, headers = {}, initialWait = 2000, maxWait = 30000 } = {}) {
   let wait = initialWait;
+  let lastErr = null;
   for (let i = 1; i <= attempts; i++) {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": CFG.ua,
-        Accept: "application/json,text/plain,*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-        ...headers,
-      },
-    });
-    if (res.status === 429 || res.status === 503) {
-      log(`  ${res.status} rate-limited, sleeping ${wait}ms (${i}/${attempts})`);
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": CFG.ua,
+          Accept: "application/json,text/plain,*/*",
+          "Accept-Language": "en-US,en;q=0.9",
+          ...headers,
+        },
+      });
+      if (res.status === 429 || res.status === 503) {
+        log(`  ${res.status} rate-limited, sleeping ${wait}ms (${i}/${attempts})`);
+        await sleep(wait);
+        wait = Math.min(wait * 2, maxWait);
+        continue;
+      }
+      if (!res.ok) {
+        let body = "";
+        try { body = (await res.text()).slice(0, 300); } catch {}
+        throw new Error(`HTTP ${res.status} ${url}${body ? ` :: ${body}` : ""}`);
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      // HTTP 4xx/5xx (no-retry) se propagan tal cual
+      if (err.message?.startsWith("HTTP ")) throw err;
+      // Errores de red/DNS/socket reset se reintentan con backoff
+      if (i >= attempts) break;
+      log(`  net error (${err.code || err.message}), sleeping ${wait}ms (${i}/${attempts})`);
       await sleep(wait);
       wait = Math.min(wait * 2, maxWait);
-      continue;
     }
-    if (!res.ok) {
-      let body = "";
-      try { body = (await res.text()).slice(0, 300); } catch {}
-      throw new Error(`HTTP ${res.status} ${url}${body ? ` :: ${body}` : ""}`);
-    }
-    return res;
   }
-  throw new Error(`Gave up after ${attempts} retries: ${url}`);
+  throw new Error(`Gave up after ${attempts} retries: ${url}${lastErr ? ` :: ${lastErr.message}` : ""}`);
 }
 
 // --- Inventario Steam --------------------------------------------------------
@@ -190,37 +207,41 @@ async function fetchProfile() {
 // Solo trackeamos market_names que estén en el inventario (ahorra memoria).
 // Por cada match guardamos TODOS los market_value para calcular min/max/median/mean.
 
-async function fetchEmpireMarket(wantedSet) {
-  if (!CFG.empireApiKey) {
-    log("CSGOEMPIRE_API_KEY vacío → salteo CSGOEmpire");
-    return new Map();
-  }
+// Pagina el mercado empezando en `startPage`. Si una página falla tras todos
+// los retries, devuelve los resultados parciales y la página que quedó pendiente
+// (hadError: true, lastPage: N) para poder retomar en una segunda pasada.
+async function fetchEmpireMarketPass(wantedSet, { startPage = 1, label = "pass 1" } = {}) {
   const values = new Map(); // market_name → number[]
   const perPage = 1000;
-  const maxPages = 100; // límite defensivo
-  let page = 1;
+  const maxPages = 100;
+  let page = startPage;
   let total = 0;
-  let relevant = 0;
+  let hadError = false;
 
-  log(`CSGOEmpire: paginando mercado (filtrando a ${wantedSet.size} items del inventario)`);
+  log(`CSGOEmpire [${label}]: paginando desde página ${startPage} (${wantedSet.size} items buscados)`);
   while (page <= maxPages) {
-    const params = new URLSearchParams({
-      per_page: String(perPage),
-      page: String(page),
-      order: "market_value",
-      sort: "asc",
-    });
-    const url = `https://csgoempire.com/api/v2/trading/items?${params.toString()}`;
-    const res = await fetchWithBackoff(url, {
-      headers: {
-        Authorization: `Bearer ${CFG.empireApiKey}`,
-        Accept: "application/json",
-      },
-      attempts: 8,
-      initialWait: 5000,
-      maxWait: 60000,
-    });
-    const data = await res.json();
+    let data;
+    try {
+      const params = new URLSearchParams({
+        per_page: String(perPage),
+        page: String(page),
+        order: "market_value",
+        sort: "asc",
+      });
+      const url = `https://csgoempire.com/api/v2/trading/items?${params.toString()}`;
+      const res = await fetchWithBackoff(url, {
+        headers: { Authorization: `Bearer ${CFG.empireApiKey}`, Accept: "application/json" },
+        attempts: 8,
+        initialWait: 5000,
+        maxWait: 60000,
+      });
+      data = await res.json();
+    } catch (err) {
+      // Error duro: guardamos lo que tenemos y marcamos la página que falló.
+      log(`  page ${page} falló: ${err.message} — corto aquí con parciales`);
+      hadError = true;
+      break;
+    }
     const list = Array.isArray(data?.data) ? data.data : [];
     if (!list.length) break;
     for (const it of list) {
@@ -229,19 +250,50 @@ async function fetchEmpireMarket(wantedSet) {
       const arr = values.get(it.market_name);
       if (arr) arr.push(it.market_value);
       else values.set(it.market_name, [it.market_value]);
-      relevant++;
     }
     total += list.length;
-    log(`  page ${page}: ${list.length} listings (matches ${values.size}/${wantedSet.size}, relevant ${relevant})`);
+    log(`  page ${page}: ${list.length} listings (matches ${values.size}/${wantedSet.size})`);
     if (list.length < perPage) break;
     page++;
     await sleep(CFG.empireDelayMs);
   }
-  log(`CSGOEmpire total: ${total} listings scanned · ${values.size}/${wantedSet.size} items con listings`);
+  log(`CSGOEmpire [${label}]: ${total} listings · ${values.size}/${wantedSet.size}${hadError ? " (parcial)" : ""}`);
+  return { values, hadError, lastPage: page };
+}
+
+// Dos pasadas: si la primera muere por rate-limit, esperamos y retomamos
+// desde la página que falló. El merge preserva los valores ya recolectados
+// (no re-escanea páginas, así que no hay duplicados).
+async function fetchEmpireMarket(wantedSet) {
+  if (!CFG.empireApiKey) {
+    log("CSGOEMPIRE_API_KEY vacío → salteo CSGOEmpire");
+    return new Map();
+  }
+  const allValues = new Map();
+  const merge = (src) => {
+    for (const [k, v] of src) {
+      const cur = allValues.get(k);
+      if (cur) cur.push(...v);
+      else allValues.set(k, [...v]);
+    }
+  };
+
+  const p1 = await fetchEmpireMarketPass(wantedSet, { startPage: 1, label: "pass 1" });
+  merge(p1.values);
+
+  if (p1.hadError) {
+    log(`CSGOEmpire: esperando ${Math.round(CFG.empireSecondPassWaitMs / 1000)}s antes de 2ª pasada desde página ${p1.lastPage}`);
+    await sleep(CFG.empireSecondPassWaitMs);
+    const p2 = await fetchEmpireMarketPass(wantedSet, { startPage: p1.lastPage, label: "pass 2" });
+    merge(p2.values);
+    if (p2.hadError) {
+      log(`CSGOEmpire: 2ª pasada también incompleta, Steam fallback rescata el resto`);
+    }
+  }
 
   // Collapse a stats por market_name
   const stats = new Map();
-  for (const [name, arr] of values) {
+  for (const [name, arr] of allValues) {
     arr.sort((a, b) => a - b);
     const min = arr[0];
     const max = arr[arr.length - 1];
@@ -251,6 +303,7 @@ async function fetchEmpireMarket(wantedSet) {
     const median = arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
     stats.set(name, { min, max, mean, median, count: arr.length });
   }
+  log(`CSGOEmpire total final: ${stats.size}/${wantedSet.size} items con listings`);
   return stats;
 }
 
@@ -287,10 +340,11 @@ function parseMoney(str) {
 }
 
 async function fetchSteamPriceUsd(hashName) {
-  // Steam rate-limitea fuerte. Fail fast: 2 intentos, wait corto. Los items
-  // que fallen ahora los rescatamos en la próxima corrida (TTL cache los mantiene).
+  // Steam rate-limitea fuerte, especialmente desde IPs cloud (GH Actions).
+  // 4 intentos con backoff largo — si la IP no está bloqueada al menos
+  // algunos items pasan. Los que fallen se cachean vía TTL igual.
   const url = `https://steamcommunity.com/market/priceoverview/?appid=${CFG.appId}&currency=1&market_hash_name=${encodeURIComponent(hashName)}`;
-  const res = await fetchWithBackoff(url, { attempts: 2, initialWait: 1500, maxWait: 3000 });
+  const res = await fetchWithBackoff(url, { attempts: 4, initialWait: 3000, maxWait: 30000 });
   const data = await res.json();
   if (!data?.success) return null;
   return {
@@ -335,11 +389,15 @@ async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
   // Fallback Steam con TTL para no repedir los mismos items cada corrida
   const ttlMs = CFG.steamFallbackTtlMin * 60_000;
   const now = Date.now();
-  let refreshed = 0, reused = 0, failed = 0;
+  let refreshed = 0, reused = 0, failed = 0, stale = 0;
+  let consecFails = 0;
+  let breakerTripped = false;
 
   for (let i = 0; i < missing.length; i++) {
     const hash = missing[i];
     const prev = prevPrices?.prices?.[hash];
+
+    // Reuso dentro del TTL: no molestamos a Steam.
     if (
       prev?.source === "steam" &&
       prev.updatedAt &&
@@ -350,6 +408,20 @@ async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
       reused++;
       continue;
     }
+
+    // Circuit breaker: si Steam nos rompe N veces seguidas, salteamos el
+    // resto de la pasada y dejamos que la próxima corrida lo reintente.
+    // Los items que tenían precio Steam previo (aunque vencido) se mantienen.
+    if (breakerTripped) {
+      if (prev?.source === "steam" && prev.price != null) {
+        out[hash] = prev;
+        stale++;
+      } else {
+        failed++;
+      }
+      continue;
+    }
+
     try {
       const p = await fetchSteamPriceUsd(hash);
       if (p && (p.lowest != null || p.median != null)) {
@@ -362,14 +434,30 @@ async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
           updatedAt: Date.now(),
         };
         refreshed++;
+        consecFails = 0;
+      } else if (prev?.source === "steam" && prev.price != null) {
+        // Steam respondió pero sin datos útiles → mantenemos el previo
+        out[hash] = prev;
+        stale++;
       } else {
         failed++;
       }
     } catch (err) {
-      failed++;
-      log(`  steam error "${hash}":`, err.message);
+      consecFails++;
+      if (prev?.source === "steam" && prev.price != null) {
+        out[hash] = prev;
+        stale++;
+      } else {
+        failed++;
+      }
+      log(`  steam error "${hash}" (${consecFails} seguidos):`, err.message);
+      if (consecFails >= CFG.steamBreakerThreshold) {
+        log(`  Steam tiró ${consecFails} errores seguidos — corto fallback, reuso precios previos`);
+        breakerTripped = true;
+      }
     }
-    if ((refreshed + failed) % 25 === 0 && (refreshed + failed) > 0) {
+
+    if ((refreshed + failed + stale) % 25 === 0 && (refreshed + failed + stale) > 0) {
       await writeAtomic(PRICES_FILE, {
         currency: iso, usdToCurrencyRate: rate, updatedAt: Date.now(), prices: out,
       });
@@ -377,7 +465,7 @@ async function buildPrices(inventory, empireStats, prevPrices, rate, iso) {
     await sleep(CFG.steamDelayMs);
   }
 
-  log(`Fallback Steam → refresh ${refreshed} · reuse ${reused} · sin precio ${failed}`);
+  log(`Fallback Steam → refresh ${refreshed} · reuse ${reused} · stale ${stale} · sin precio ${failed}`);
   return { currency: iso, usdToCurrencyRate: rate, updatedAt: Date.now(), prices: out };
 }
 
@@ -395,8 +483,23 @@ async function runOnce() {
   }
 
   const rawInv = await fetchInventory();
-  const inventory = normalizeInventory(rawInv);
+  let inventory = normalizeInventory(rawInv);
   log(`Inventario normalizado: ${inventory.items.length} items`);
+
+  // Safeguard: Steam a veces responde "more_items: false" en medio de la
+  // paginación y nos devuelve un inventario truncado. Si el nuevo tiene
+  // <90% del previo, asumimos que fue fetch parcial y mantenemos el viejo.
+  const prevInv = await readJsonIfExists(INVENTORY_FILE, null);
+  if (
+    prevInv?.items?.length &&
+    inventory.items.length > 0 &&
+    inventory.items.length < prevInv.items.length * 0.9
+  ) {
+    log(
+      `⚠ Inventario nuevo ${inventory.items.length} < 90% del previo ${prevInv.items.length} — mantengo el previo`,
+    );
+    inventory = { ...prevInv, fetchedAt: Date.now() };
+  }
   await writeAtomic(INVENTORY_FILE, inventory);
 
   const wantedSet = new Set(inventory.items.map((it) => it.marketHashName));
