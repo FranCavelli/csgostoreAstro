@@ -15,6 +15,7 @@ const profile = await loadProfile();
 const favicon = profile.avatarIcon || profile.avatarFull || "/favicon.svg";
 const kickUrl = `https://kick.com/${config.kickUsername}`;
 const discordEnabled = !!config.discordUrl && config.discordUrl !== "#";
+const avatar = `${import.meta.env.BASE_URL}lion.webp`;
 ---
 
 <!doctype html>
@@ -41,8 +42,10 @@ const discordEnabled = !!config.discordUrl && config.discordUrl !== "#";
         <div class="max-w-6xl mx-auto px-5 py-3 flex items-center gap-4">
           <a href={homeUrl()} class="flex items-center gap-3">
             {profile.avatarIcon ? (
-              <img src={profile.avatarIcon} alt="" class="w-7 h-7 rounded" />
-            ) : null}
+              <img src={avatar} alt={profile.avatarIcon} class="w-7 h-7 rounded" />
+            ) : 
+              <img src={avatar} alt="Sixbulletss" class="w-7 h-7 rounded" />
+            }
             <span class="text-sm font-medium tracking-wide">Sixbulletss Store</span>
           </a>
           <nav class="ml-auto flex items-center gap-4 text-sm">
@@ -72,7 +75,7 @@ const discordEnabled = !!config.discordUrl && config.discordUrl !== "#";
               target="_blank"
               rel="noopener"
             >
-              <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+              <span id="dotLive" class= "hidden w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
               <span>Kick ↗</span>
               <span
                 id="kick-live"
@@ -102,8 +105,10 @@ const discordEnabled = !!config.discordUrl && config.discordUrl !== "#";
           const data = await r.json();
           const live = !!(data && data.livestream);
           const pill = document.getElementById("kick-live");
+          const dot = document.getElementById("dotLive");
           if (!pill) return;
           pill.classList.toggle("hidden", !live);
+          dot.classList.toggle("hidden", !live);
         } catch {}
       }
       checkKickLive();
