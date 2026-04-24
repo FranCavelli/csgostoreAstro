@@ -155,6 +155,10 @@
      - border-color + shadow   → canto y glow
    El hover intensifica todo.
    ────────────────────────────────────────────────────────────── */
+option{
+  color: white;
+  background-color: #1f2937;
+}
 .item-card {
   --rarity: #d4a84c;
   position: relative;

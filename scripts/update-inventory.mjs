@@ -234,6 +234,52 @@ async function fetchEmpireMarket(wantedSet) {
   }
   log(`CSGOEmpire total: ${total} listings scanned · ${values.size}/${wantedSet.size} items con listings`);
 
+  // Segundo pase: la paginación de CSGOEmpire a veces saltea items cuando hay
+  // muchos con el mismo market_value. Para los faltantes hacemos search directo.
+  const missing = [...wantedSet].filter((n) => !values.has(n));
+  if (missing.length) {
+    log(`Segundo pase: search directo para ${missing.length} items sin match`);
+    let rescued = 0;
+    for (let i = 0; i < missing.length; i++) {
+      const name = missing[i];
+      const sp = new URLSearchParams({
+        per_page: "100",
+        page: "1",
+        search: name,
+        order: "market_value",
+        sort: "asc",
+      });
+      const url = `https://csgoempire.com/api/v2/trading/items?${sp.toString()}`;
+      try {
+        const res = await fetchWithBackoff(url, {
+          headers: {
+            Authorization: `Bearer ${CFG.empireApiKey}`,
+            Accept: "application/json",
+          },
+          attempts: 5,
+          initialWait: 3000,
+          maxWait: 30000,
+        });
+        const data = await res.json();
+        const list = Array.isArray(data?.data) ? data.data : [];
+        const matches = list.filter(
+          (it) => it?.market_name === name && typeof it.market_value === "number",
+        );
+        if (matches.length) {
+          values.set(name, matches.map((m) => m.market_value));
+          rescued++;
+        }
+      } catch (err) {
+        log(`  search error "${name}":`, err.message);
+      }
+      if ((i + 1) % 25 === 0) {
+        log(`  search ${i + 1}/${missing.length} (rescued ${rescued})`);
+      }
+      await sleep(CFG.empireDelayMs);
+    }
+    log(`Segundo pase → rescató ${rescued}/${missing.length} items`);
+  }
+
   // Collapse a stats por market_name
   const stats = new Map();
   for (const [name, arr] of values) {

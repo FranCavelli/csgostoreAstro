@@ -8,7 +8,8 @@
       "Bash(npm run *)",
       "Bash(node *)",
       "Read(//c/Program Files/**)",
-      "Bash(command -v gh.exe)"
+      "Bash(command -v gh.exe)",
+      "Bash(grep -E --line-buffered \"Segundo pase|rescató|CSGOEmpire →|OK$|Error|falló\")"
     ]
   }
 }

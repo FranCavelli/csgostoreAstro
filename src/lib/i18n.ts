@@ -30,12 +30,12 @@ const TYPE_ES: Record<string, string> = {
 };
 
 const EXTERIOR_ES: Record<string, string> = {
-  "Factory New": "Recién Fabricado",
-  "Minimal Wear": "Algo Desgastado",
-  "Field-Tested": "Probado en Combate",
-  "Well-Worn": "Muy Desgastado",
-  "Battle-Scarred": "Deteriorado",
-  "Not Painted": "Sin Pintar",
+  "Factory New": "Recién fabricado",
+  "Minimal Wear": "Casi nuevo",
+  "Field-Tested": "Algo desgastado",
+  "Well-Worn": "Bastante desgastado",
+  "Battle-Scarred": "Muy desgastado",
+  "Not Painted": "Sin pintar"
 };
 
 const RARITY_ES: Record<string, string> = {
