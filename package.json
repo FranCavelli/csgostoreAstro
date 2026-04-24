@@ -5,8 +5,8 @@
   "private": true,
   "description": "CS2 skin store — genera un sitio estático con inventario y precios del perfil de Steam.",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "dev": "node --env-file-if-exists=.env node_modules/astro/astro.js dev",
+    "build": "node --env-file-if-exists=.env node_modules/astro/astro.js build",
     "preview": "astro preview",
     "astro": "astro",
     "update": "node --env-file-if-exists=.env scripts/update-inventory.mjs --once",

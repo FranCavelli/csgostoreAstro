@@ -6,7 +6,9 @@
       "WebFetch(domain:github.com)",
       "Bash(node --env-file=.env -e ' *)",
       "Bash(npm run *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Read(//c/Program Files/**)",
+      "Bash(command -v gh.exe)"
     ]
   }
 }

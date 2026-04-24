@@ -59,6 +59,8 @@ jobs:
           CURRENCY_ISO: ${{ vars.CURRENCY_ISO || 'USD' }}
           STEAM_CURRENCY: ${{ vars.STEAM_CURRENCY || '1' }}
           MARKET_MULTIPLIER: ${{ vars.MARKET_MULTIPLIER || '1' }}
+          DISCORD_URL: ${{ vars.DISCORD_URL }}
+          KICK_USERNAME: ${{ vars.KICK_USERNAME || 'sixbulletss' }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

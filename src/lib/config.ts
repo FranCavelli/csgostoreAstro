@@ -14,6 +14,8 @@ export const config = {
   currencyCode: num(process.env.STEAM_CURRENCY, 1),
   currencyIso: (process.env.CURRENCY_ISO || "USD").toUpperCase(),
   updateIntervalMinutes: num(process.env.UPDATE_INTERVAL_MINUTES, 30),
+  discordUrl: process.env.DISCORD_URL || "#",
+  kickUsername: process.env.KICK_USERNAME || "sixbulletss",
 };
 
 export type AppConfig = typeof config;
